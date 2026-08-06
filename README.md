@@ -1,43 +1,90 @@
-# pi-ext
+# 🧩 Pi Extensions for the Pi Coding Agent
 
-Independently installable extensions for the Pi coding agent, managed as an npm workspace.
+[![npm scope](https://img.shields.io/badge/npm-@moguw-blue)](https://www.npmjs.com/org/moguw)
 
-## Install
+Independently installable [Pi Coding Agent](https://pi.dev) extensions, managed as an npm workspace.
+Every package is published separately under the `@moguw` npm scope — install only what you need.
 
-Install every production extension from GitHub:
+## 🚀 Quick start
 
-```bash
-pi install git:github.com/Mieluoxxx/pi-ext
-```
-
-Install only the session rename extension from npm:
+Install an extension permanently:
 
 ```bash
 pi install npm:@moguw/pi-session-rename
 ```
 
-## Development
+Try one without adding it permanently:
+
+```bash
+pi -e npm:@moguw/pi-session-migrate
+```
+
+> [!IMPORTANT]
+> Pi extensions run with your full user permissions. Review an extension before installing it from any third party.
+
+## 📦 Choose an extension
+
+### Session management
+
+| Package | Use it for | Install |
+| --- | --- | --- |
+| [`pi-session-rename`](./extensions/pi-session-rename) | Automatically name Pi sessions from conversation context, with a manual `/rename` command. | `pi install npm:@moguw/pi-session-rename` |
+| [`pi-session-migrate`](./extensions/pi-session-migrate) | Migrate a project's Pi sessions after the project moves to a new path, via `/migrate`. | `pi install npm:@moguw/pi-session-migrate` |
+
+## 🔧 Advanced installation
+
+Install this repository directly from GitHub as one Pi package:
+
+```bash
+pi install git:github.com/Mieluoxxx/pi-ext
+```
+
+The repository root auto-discovers every production extension under `extensions/`, so this enables all of them.
+
+To load only selected extensions, replace the installed package entry in `~/.pi/agent/settings.json` with a resource filter:
+
+```json
+{
+  "packages": [
+    {
+      "source": "git:github.com/Mieluoxxx/pi-ext",
+      "extensions": [
+        "extensions/pi-session-rename/src/index.ts",
+        "extensions/pi-session-migrate/src/index.ts"
+      ]
+    }
+  ]
+}
+```
+
+Filters use resource paths relative to the repository root. Restart Pi or run `/reload` after changing the filter.
+
+## 🧑‍💻 Local development
+
+From the repository root:
 
 ```bash
 npm install
 npm run check
 ```
 
-Try the extension from the repository root:
+Try an extension from the repository root without installing it:
 
 ```bash
 pi -e ./extensions/pi-session-rename
+pi -e ./extensions/pi-session-migrate
 ```
 
-## Repository layout
+## 🗂️ Repository structure
 
 ```text
-extensions/  Independently published production Pi extensions
-docs/        Repository designs and decisions
+extensions/   Independently published production Pi extensions
+docs/         Repository designs and decisions
 ```
 
-Each extension owns its package metadata, documentation, tests, and a thin `src/index.ts` Pi entrypoint. The private repository root supplies workspace orchestration and is installable as one Git-backed Pi package.
+Each extension owns its package metadata, documentation, tests, and a thin `src/index.ts` Pi entrypoint.
+The private repository root supplies workspace orchestration and is installable as one Git-backed Pi package.
 
-## License
+## 📄 License
 
-Each extension declares its license in its package directory.
+Each extension declares its own license in its package directory.
