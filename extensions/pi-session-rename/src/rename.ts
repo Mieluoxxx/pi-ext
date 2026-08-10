@@ -9,6 +9,11 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { loadConfig, type RenameConfig } from "./config.js";
 import { appendDebugLog, getEmptyNameReason, summarizeNamingResponse } from "./debug.js";
+import {
+	renameCurrentHerdrTab,
+	renameCurrentHerdrTabIfDefault,
+	type HerdrSyncResult,
+} from "./herdr.js";
 import { showSettings } from "./settings.js";
 
 const STATUS_KEY = "rename";
@@ -275,6 +280,22 @@ async function generateSessionName(
 	return name;
 }
 
+function notifyRenameResult(
+	ctx: ExtensionCommandContext,
+	name: string,
+	herdr: HerdrSyncResult,
+): void {
+	if (herdr.status === "failed") {
+		ctx.ui.notify(
+			`Session name set, but Herdr tab rename failed: ${herdr.error}`,
+			"warning",
+		);
+		return;
+	}
+	const suffix = herdr.status === "renamed" ? " · Herdr tab renamed" : "";
+	ctx.ui.notify(`Session name set: ${name}${suffix}`, "info");
+}
+
 async function runRename(
 	pi: ExtensionAPI,
 	ctx: ExtensionCommandContext,
@@ -290,7 +311,8 @@ async function runRename(
 	try {
 		const name = await generateSessionName(ctx, config);
 		pi.setSessionName(name);
-		ctx.ui.notify(`Session name set: ${name}`, "info");
+		const herdr = await renameCurrentHerdrTab(name);
+		notifyRenameResult(ctx, name, herdr);
 	} catch (error) {
 		logDebugError(ctx, error);
 		ctx.ui.notify(
@@ -319,7 +341,8 @@ export default function (pi: ExtensionAPI) {
 					case "set-name": {
 						if (command.name) {
 							pi.setSessionName(command.name);
-							ctx.ui.notify(`Session name set: ${command.name}`, "info");
+							const herdr = await renameCurrentHerdrTab(command.name);
+							notifyRenameResult(ctx, command.name, herdr);
 						} else {
 							ctx.ui.notify("Session name cannot be empty", "warning");
 						}
@@ -361,6 +384,7 @@ export default function (pi: ExtensionAPI) {
 			if (!shouldApplyAutoName(epoch, sessionEpoch, pi.getSessionName())) return;
 			pi.setSessionName(name);
 			ctx.ui.notify(`Session name set: ${name}`, "info");
+			await renameCurrentHerdrTabIfDefault(name);
 		} catch (error) {
 			logDebugError(ctx, error);
 			ctx.ui.notify(
@@ -373,6 +397,12 @@ export default function (pi: ExtensionAPI) {
 			ctx.ui.setStatus(STATUS_KEY, undefined);
 			autoRenameRunning = false;
 		}
+	});
+
+	pi.on("session_start", async () => {
+		const sessionName = pi.getSessionName()?.trim();
+		if (!sessionName) return;
+		await renameCurrentHerdrTabIfDefault(sessionName);
 	});
 
 	pi.on("session_shutdown", async () => {

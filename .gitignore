@@ -2,3 +2,4 @@ node_modules/
 *.tgz
 debug.log
 .DS_Store
+temp/
