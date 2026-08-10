@@ -186,6 +186,13 @@ export function parseRenameCommand(args: string): RenameCommand {
 	return { kind: "set-name", name: stripQuotes(trimmed) };
 }
 
+export function getRenameArgumentCompletions(
+	prefix: string,
+): Array<{ value: string; label: string; description: string }> | null {
+	if (!"settings".startsWith(prefix)) return null;
+	return [{ value: "settings", label: "settings", description: "Open session rename settings" }];
+}
+
 export function shouldApplyAutoName(
 	epoch: number,
 	currentEpoch: number,
@@ -330,7 +337,8 @@ export default function (pi: ExtensionAPI) {
 
 	pi.registerCommand("rename", {
 		description: "Generate or set a session name",
-			handler: async (args, ctx) => {
+		getArgumentCompletions: getRenameArgumentCompletions,
+		handler: async (args, ctx) => {
 				const command = parseRenameCommand(args);
 				switch (command.kind) {
 					case "settings":

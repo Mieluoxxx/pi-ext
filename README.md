@@ -30,6 +30,7 @@ pi -e npm:@moguw/pi-session-migrate
 | --- | --- | --- |
 | [`pi-session-rename`](./extensions/pi-session-rename) | Automatically name Pi sessions from conversation context, with a manual `/rename` command. | `pi install npm:@moguw/pi-session-rename` |
 | [`pi-session-migrate`](./extensions/pi-session-migrate) | Migrate a project's Pi sessions after the project moves to a new path, via `/migrate`. | `pi install npm:@moguw/pi-session-migrate` |
+| [`pi-session-fork`](./extensions/pi-session-fork) | Fork the session into a Herdr pane/tab, and ask inline (in-context) or outline (out-of-context) side questions, via `/btw`. | `pi install npm:@moguw/pi-session-fork` |
 
 ## 🔧 Advanced installation
 

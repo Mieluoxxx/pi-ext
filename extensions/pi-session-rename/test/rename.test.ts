@@ -12,6 +12,7 @@ import {
 import {
 	buildNamingOptions,
 	extractSessionName,
+	getRenameArgumentCompletions,
 	parseModelRef,
 	parseRenameCommand,
 	resolveThinkingLevel,
@@ -62,6 +63,22 @@ describe("parseRenameCommand", () => {
 			kind: "set-name",
 			name: "settings",
 		});
+	});
+});
+
+describe("getRenameArgumentCompletions", () => {
+	it("completes the settings subcommand", () => {
+		const settingsCompletion = {
+			value: "settings",
+			label: "settings",
+			description: "Open session rename settings",
+		};
+		expect(getRenameArgumentCompletions("")).toEqual([settingsCompletion]);
+		expect(getRenameArgumentCompletions("set")).toEqual([settingsCompletion]);
+	});
+
+	it("returns null for a manual session name", () => {
+		expect(getRenameArgumentCompletions("release")).toBeNull();
 	});
 });
 
