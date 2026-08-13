@@ -20,7 +20,7 @@ import {
 	shouldApplyAutoName,
 	stripQuotes,
 } from "../src/rename.js";
-import { showSettings } from "../src/settings.js";
+import { MODEL_SELECTOR_MAX_VISIBLE, showSettings } from "../src/settings.js";
 
 describe("parseRenameCommand", () => {
 	it("parses bare /rename as generate", () => {
@@ -102,6 +102,47 @@ describe("showSettings", () => {
 		expect(menu.some((item) => item.startsWith("afterSteps:"))).toBe(true);
 		expect(menu).toContain("Done");
 		expect(menu.some((item) => item.startsWith("prompt:"))).toBe(false);
+	});
+
+	it("caps the model selector height for large model registries", async () => {
+		let settingsSelections = 0;
+		let renderedLines: string[] = [];
+		const theme = {
+			fg: (_color: string, text: string) => text,
+			bold: (text: string) => text,
+		};
+
+		await showSettings({
+			mode: "tui",
+			modelRegistry: {
+				getAvailable: () =>
+					Array.from({ length: 30 }, (_, index) => ({
+						provider: "provider",
+						id: `model-${index}`,
+					})),
+			},
+			ui: {
+				notify: () => undefined,
+				select: async () => {
+					settingsSelections += 1;
+					return settingsSelections === 1 ? "model: (current session model)" : "Done";
+				},
+				custom: async (factory: any) => {
+					const component = factory(
+						{ requestRender: () => undefined },
+						theme,
+						{},
+						() => undefined,
+					);
+					renderedLines = component.render(120);
+					return undefined;
+				},
+			},
+		} as any);
+
+		// Borders, title, help, and the scroll indicator add five lines.
+		expect(renderedLines).toHaveLength(MODEL_SELECTOR_MAX_VISIBLE + 5);
+		expect(renderedLines.some((line) => line.includes("(1/31)"))).toBe(true);
 	});
 });
 
