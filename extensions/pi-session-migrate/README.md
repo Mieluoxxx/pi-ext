@@ -63,6 +63,10 @@ longer exists on disk, and groups them by old project path. Every group is liste
 Pick a group, confirm, and the sessions are copied into the current project. The source directory
 is kept as a backup.
 
+When more than one old project is listed in the interactive TUI, press `/` to filter by project
+path. Use `Up` and `Down` to navigate the filtered groups, `Enter` to select, and `Esc` to clear
+the search; press `Esc` again to cancel the picker.
+
 ### `/migrate <old-path>` (explicit mode)
 
 Migrate a specific old path (supports `~` expansion). Useful when the old sessions directory still

@@ -19,6 +19,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { loadConfig, type MigrateConfig } from "./config.js";
+import { pickSearchableMigrateGroup } from "./picker.js";
 import { showSettings } from "./settings.js";
 import {
 	encodeSessionDir,
@@ -314,6 +315,18 @@ async function pickGroup(
 	ctx: ExtensionCommandContext,
 ): Promise<GroupDisplay | undefined> {
 	if (displays.length === 1) return displays[0];
+	if (ctx.mode === "tui") {
+		const selected = await pickSearchableMigrateGroup(
+			displays.map((display) => ({
+				display,
+				oldCwd: display.group.oldCwd,
+				sessionCount: display.group.sessions.length,
+				marker: display.marker,
+			})),
+			ctx,
+		);
+		return selected?.display;
+	}
 	const choice = await ctx.ui.select("Migrate which old project into this one?", displays.map(optionText));
 	return displays.find((display) => optionText(display) === choice);
 }
