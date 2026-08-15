@@ -37,6 +37,7 @@ pi -e npm:@moguw/pi-session-migrate
 | Package | Use it for | Install |
 | --- | --- | --- |
 | [`pi-interactive-shell`](./extensions/pi-interactive-shell) | Run interactive CLIs in observable Pi overlays with interactive, hands-free, dispatch, and monitor modes. | `pi install npm:@moguw/pi-interactive-shell` |
+| [`pi-tool-display`](./extensions/pi-tool-display) | Keep tool calls compact, render richer diffs, and control noisy tool output in the Pi TUI. | `pi install npm:@moguw/pi-tool-display` |
 
 ## 🔧 Advanced installation
 
@@ -58,7 +59,8 @@ To load only selected extensions, replace the installed package entry in `~/.pi/
       "extensions": [
         "extensions/pi-session-rename/src/index.ts",
         "extensions/pi-session-migrate/src/index.ts",
-        "extensions/pi-interactive-shell/index.ts"
+        "extensions/pi-interactive-shell/index.ts",
+        "extensions/pi-tool-display/index.ts"
       ]
     }
   ]
@@ -82,6 +84,7 @@ Try an extension from the repository root without installing it:
 pi -e ./extensions/pi-session-rename
 pi -e ./extensions/pi-session-migrate
 pi -e ./extensions/pi-interactive-shell
+pi -e ./extensions/pi-tool-display
 ```
 
 ## 🗂️ Repository structure
