@@ -1,0 +1,96 @@
+{
+  "name": "@moguw/pi-interactive-shell",
+  "version": "0.15.0",
+  "description": "Run AI coding agents in pi TUI overlays with interactive, hands-free, and dispatch supervision",
+  "type": "module",
+  "license": "MIT",
+  "private": false,
+  "author": "Mieluoxxx",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mieluoxxx/pi-ext.git",
+    "directory": "extensions/pi-interactive-shell"
+  },
+  "bugs": {
+    "url": "https://github.com/Mieluoxxx/pi-ext/issues"
+  },
+  "homepage": "https://github.com/Mieluoxxx/pi-ext/tree/main/extensions/pi-interactive-shell#readme",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "interactive",
+    "shell",
+    "terminal",
+    "tui",
+    "subagent",
+    "claude",
+    "gemini",
+    "codex"
+  ],
+  "files": [
+    "index.ts",
+    "config.ts",
+    "key-encoding.ts",
+    "overlay-component.ts",
+    "pty-session.ts",
+    "reattach-overlay.ts",
+    "session-manager.ts",
+    "tool-schema.ts",
+    "headless-monitor.ts",
+    "types.ts",
+    "background-widget.ts",
+    "handoff-utils.ts",
+    "notification-utils.ts",
+    "pty-log.ts",
+    "pty-protocol.ts",
+    "runtime-coordinator.ts",
+    "session-query.ts",
+    "spawn.ts",
+    "skills/**/*",
+    "examples/",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "check": "npm run typecheck && npm test",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@xterm/addon-serialize": "^0.13.0",
+    "@xterm/headless": "^5.5.0",
+    "zigpty": "^0.1.6"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.83.0",
+    "@earendil-works/pi-tui": "^0.83.0",
+    "@types/node": "^22.19.19",
+    "typebox": "^1.3.14",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  }
+}

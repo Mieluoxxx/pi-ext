@@ -1,0 +1,471 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+type OverlayOptionsCapture = { command: string; reason?: string; cwd?: string; mode?: string; sessionId?: string } | null;
+
+type SpawnConfigOverrides = {
+	focusShortcut?: string;
+	spawn?: {
+		defaultAgent?: "pi" | "codex" | "claude" | "cursor";
+		shortcut?: string;
+		commands?: Partial<Record<"pi" | "codex" | "claude" | "cursor", string>>;
+		defaultArgs?: Partial<Record<"pi" | "codex" | "claude" | "cursor", string[]>>;
+		worktree?: boolean;
+		worktreeBaseDir?: string;
+	};
+};
+
+async function setupExtensionHarness(configOverrides: SpawnConfigOverrides = {}) {
+	let lastOverlayOptions: OverlayOptionsCapture = null;
+	let registeredTool: { execute: (...args: any[]) => Promise<any> } | null = null;
+
+	vi.resetModules();
+	vi.doMock("@earendil-works/pi-coding-agent", () => ({
+		getAgentDir: () => "/tmp/pi-agent",
+	}));
+	vi.doMock("@earendil-works/pi-tui", () => ({
+		matchesKey: () => false,
+		truncateToWidth: (value: string) => value,
+		visibleWidth: (value: string) => value.length,
+	}));
+	vi.doMock("../config.ts", async () => {
+		const actual = await vi.importActual<typeof import("../config.ts")>("../config.ts");
+		return {
+			...actual,
+			loadConfig: vi.fn(() => ({
+				exitAutoCloseDelay: 10,
+				overlayWidthPercent: 95,
+				overlayHeightPercent: 60,
+				focusShortcut: configOverrides.focusShortcut ?? "alt+shift+f",
+				spawn: {
+					defaultAgent: configOverrides.spawn?.defaultAgent ?? "pi",
+					shortcut: configOverrides.spawn?.shortcut ?? "alt+shift+p",
+					commands: {
+						pi: configOverrides.spawn?.commands?.pi ?? "pi",
+						codex: configOverrides.spawn?.commands?.codex ?? "codex",
+						claude: configOverrides.spawn?.commands?.claude ?? "claude",
+						cursor: configOverrides.spawn?.commands?.cursor ?? "agent",
+					},
+					defaultArgs: {
+						pi: configOverrides.spawn?.defaultArgs?.pi ?? [],
+						codex: configOverrides.spawn?.defaultArgs?.codex ?? [],
+						claude: configOverrides.spawn?.defaultArgs?.claude ?? [],
+						cursor: configOverrides.spawn?.defaultArgs?.cursor ?? ["--model", "composer-2-fast"],
+					},
+					worktree: configOverrides.spawn?.worktree ?? false,
+					worktreeBaseDir: configOverrides.spawn?.worktreeBaseDir,
+				},
+				scrollbackLines: 5000,
+				ansiReemit: true,
+				handoffPreviewEnabled: true,
+				handoffPreviewLines: 30,
+				handoffPreviewMaxChars: 2000,
+				handoffSnapshotEnabled: false,
+				handoffSnapshotLines: 200,
+				handoffSnapshotMaxChars: 12000,
+				transferLines: 200,
+				transferMaxChars: 20000,
+				completionNotifyLines: 50,
+				completionNotifyMaxChars: 5000,
+				handsFreeUpdateMode: "on-quiet",
+				handsFreeUpdateInterval: 60000,
+				handsFreeQuietThreshold: 8000,
+				autoExitGracePeriod: 15000,
+				handsFreeUpdateMaxChars: 1500,
+				handsFreeMaxTotalChars: 100000,
+				minQueryIntervalSeconds: 60,
+			})),
+		};
+	});
+	vi.doMock("../overlay-component.ts", () => ({
+		InteractiveShellOverlay: class MockInteractiveShellOverlay {
+			constructor(_tui: unknown, _theme: unknown, options: { command: string; reason?: string; cwd?: string; mode?: string; sessionId?: string }) {
+				lastOverlayOptions = { command: options.command, reason: options.reason, cwd: options.cwd, mode: options.mode, sessionId: options.sessionId };
+			}
+		},
+	}));
+	vi.doMock("../spawn.ts", async () => {
+		const actual = await vi.importActual<typeof import("../spawn.ts")>("../spawn.ts");
+		return {
+			...actual,
+			resolveSpawn: vi.fn((config, cwd, request, getSessionFile) => actual.resolveSpawn(config, cwd, request, getSessionFile)),
+		};
+	});
+
+	const extensionModule = await import("../index.ts");
+	const extension = extensionModule.default;
+
+	const commands = new Map<string, { handler: (args: string, ctx: any) => Promise<void> | void }>();
+	const shortcuts = new Map<string, { handler: (ctx: any) => Promise<void> | void }>();
+	let nextCustomResult: any = { exitCode: 0, backgrounded: false, cancelled: false };
+
+	const pi = {
+		registerShortcut: vi.fn((shortcut: string, options: { handler: (ctx: any) => Promise<void> | void }) => {
+			shortcuts.set(shortcut, options);
+		}),
+		registerCommand: vi.fn((name: string, options: { handler: (args: string, ctx: any) => Promise<void> | void }) => {
+			commands.set(name, options);
+		}),
+		registerTool: vi.fn((tool: any) => {
+			registeredTool = tool;
+		}),
+		on: vi.fn(),
+		events: { emit: vi.fn() },
+		sendMessage: vi.fn(),
+	};
+
+	extension(pi as any);
+
+	const notify = vi.fn();
+	const custom = vi.fn(async (factory: (tui: any, theme: any, kb: any, done: (result: unknown) => void) => unknown) => {
+		const done = vi.fn();
+		factory(
+			{ terminal: { columns: 120, rows: 40 }, requestRender: vi.fn() },
+			{ fg: (_color: string, text: string) => text },
+			{},
+			done,
+		);
+		return nextCustomResult;
+	});
+
+	const ctx = {
+		ui: { notify, custom },
+		cwd: "/tmp/project",
+		hasUI: true,
+		sessionManager: {
+			getSessionFile: () => "/tmp/project/session.jsonl",
+		},
+	};
+
+	return {
+		commands,
+		shortcuts,
+		ctx,
+		notify,
+		custom,
+		pi,
+		getTool: () => registeredTool,
+		setCustomResult: (result: any) => {
+			nextCustomResult = result;
+		},
+		getLastOverlayOptions: () => lastOverlayOptions,
+	};
+}
+
+describe("/spawn command, shortcut, and tool spawn", () => {
+	afterEach(() => {
+		vi.doUnmock("@earendil-works/pi-coding-agent");
+		vi.doUnmock("@earendil-works/pi-tui");
+		vi.doUnmock("../config.ts");
+		vi.doUnmock("../overlay-component.ts");
+		vi.doUnmock("../spawn.ts");
+	});
+
+	it("/spawn defaults to the configured default agent", async () => {
+		const harness = await setupExtensionHarness({ spawn: { defaultAgent: "codex" } });
+		const spawn = harness.commands.get("spawn");
+		expect(spawn).toBeDefined();
+
+		await spawn!.handler("", harness.ctx as any);
+		expect(harness.custom).toHaveBeenCalledTimes(1);
+		expect(harness.getLastOverlayOptions()).toMatchObject({
+			command: "codex",
+			reason: "spawn codex (fresh session)",
+		});
+	});
+
+	it("/spawn accepts explicit one-shot agent overrides", async () => {
+		const harness = await setupExtensionHarness({ spawn: { defaultAgent: "pi" } });
+		const spawn = harness.commands.get("spawn");
+		expect(spawn).toBeDefined();
+
+		await spawn!.handler("claude", harness.ctx as any);
+		expect(harness.getLastOverlayOptions()).toMatchObject({
+			command: "claude",
+			reason: "spawn claude (fresh session)",
+		});
+	});
+
+	it("/spawn cursor resolves through the cursor command mapping", async () => {
+		const harness = await setupExtensionHarness({ spawn: { defaultAgent: "pi" } });
+		const spawn = harness.commands.get("spawn");
+		expect(spawn).toBeDefined();
+
+		await spawn!.handler("cursor", harness.ctx as any);
+		expect(harness.getLastOverlayOptions()).toMatchObject({
+			command: "agent --model composer-2-fast",
+			reason: "spawn cursor (fresh session)",
+		});
+	});
+
+	it("/spawn supports monitored prompt-bearing launches with the shared resolver", async () => {
+		const harness = await setupExtensionHarness({ spawn: { defaultAgent: "pi" } });
+		const spawn = harness.commands.get("spawn");
+		expect(spawn).toBeDefined();
+
+		await spawn!.handler('"review the diffs" --dispatch', harness.ctx as any);
+		expect(harness.getLastOverlayOptions()).toMatchObject({
+			command: "pi 'review the diffs'",
+			reason: "spawn pi (fresh session)",
+		});
+		expect(harness.notify).not.toHaveBeenCalledWith(expect.stringContaining("requires"), "error");
+	});
+
+	it("/spawn pi fork quotes the current session file safely for the active shell", async () => {
+		const harness = await setupExtensionHarness();
+		harness.ctx.sessionManager.getSessionFile = () => "/tmp/project/it's session.jsonl";
+		const spawn = harness.commands.get("spawn");
+		expect(spawn).toBeDefined();
+
+		await spawn!.handler("pi fork", harness.ctx as any);
+		const expectedForkArg = process.platform === "win32"
+			? '"/tmp/project/it\'s session.jsonl"'
+			: "'/tmp/project/it'\\''s session.jsonl'";
+		expect(harness.getLastOverlayOptions()).toMatchObject({
+			command: `pi --fork ${expectedForkArg}`,
+			reason: "spawn pi (fork current session)",
+		});
+	});
+
+	it("/spawn codex fork fails with a clear pi-only error", async () => {
+		const harness = await setupExtensionHarness();
+		const spawn = harness.commands.get("spawn");
+		expect(spawn).toBeDefined();
+
+		await spawn!.handler("codex fork", harness.ctx as any);
+		expect(harness.custom).not.toHaveBeenCalled();
+		expect(harness.notify).toHaveBeenCalledWith(
+			"Cannot fork codex. Fork is only supported for pi sessions.",
+			"error",
+		);
+	});
+
+	it("spawn shortcut uses the configured default agent and configured key", async () => {
+		const harness = await setupExtensionHarness({
+			spawn: { defaultAgent: "claude", shortcut: "alt+shift+s" },
+		});
+		const shortcut = harness.shortcuts.get("alt+shift+s");
+		expect(shortcut).toBeDefined();
+		expect(harness.shortcuts.get("alt+shift+p")).toBeUndefined();
+
+		await shortcut!.handler(harness.ctx as any);
+		expect(harness.getLastOverlayOptions()).toMatchObject({ command: "claude" });
+	});
+
+	it("interactive_shell accepts raw commands beside empty spawn placeholders", async () => {
+		const harness = await setupExtensionHarness();
+		const tool = harness.getTool();
+		expect(tool).toBeTruthy();
+
+		const result = await tool!.execute("call-1", {
+			command: "printf placeholder-ok",
+			spawn: { agent: "", mode: "fresh", worktree: false, prompt: "" },
+			mode: "interactive",
+		}, undefined, undefined, harness.ctx as any);
+
+		expect(result.isError).not.toBe(true);
+		expect(harness.getLastOverlayOptions()).toMatchObject({ command: "printf placeholder-ok" });
+	});
+
+	it("interactive_shell ignores empty spawn placeholders for existing-session queries", async () => {
+		const harness = await setupExtensionHarness();
+		const tool = harness.getTool();
+		expect(tool).toBeTruthy();
+
+		const result = await tool!.execute("call-1", {
+			sessionId: "missing-session",
+			spawn: {},
+		}, undefined, undefined, harness.ctx as any);
+
+		expect(result.content[0].text).toBe("Session not found or no longer active: missing-session");
+	});
+
+	it("interactive_shell rejects non-empty spawn requests for existing sessions", async () => {
+		const harness = await setupExtensionHarness();
+		const tool = harness.getTool();
+		expect(tool).toBeTruthy();
+
+		const result = await tool!.execute("call-1", {
+			sessionId: "existing-session",
+			spawn: { agent: "codex" },
+		}, undefined, undefined, harness.ctx as any);
+
+		expect(result.isError).toBe(true);
+		expect(result.content[0].text).toContain("'spawn' starts a new session only.");
+		expect(result.content[0].text).toContain("sessionId");
+	});
+
+	it.each([
+		["command and sessionId", { command: "pi", sessionId: "existing-session" }],
+		["command and attach", { command: "pi", attach: "background-session" }],
+		["sessionId and attach", { sessionId: "existing-session", attach: "background-session" }],
+	])("interactive_shell rejects %s selector conflicts", async (_description, params) => {
+		const harness = await setupExtensionHarness();
+		const tool = harness.getTool();
+		expect(tool).toBeTruthy();
+
+		const result = await tool!.execute("call-1", params, undefined, undefined, harness.ctx as any);
+
+		expect(result.isError).toBe(true);
+		expect(result.content[0].text).toContain("Use exactly one session selector");
+	});
+
+	it("interactive_shell preserves standalone default spawn and explicit false worktree", async () => {
+		const defaultHarness = await setupExtensionHarness({ spawn: { defaultAgent: "codex" } });
+		const defaultTool = defaultHarness.getTool();
+		expect(defaultTool).toBeTruthy();
+
+		const defaultResult = await defaultTool!.execute("call-1", {
+			spawn: {},
+			mode: "interactive",
+		}, undefined, undefined, defaultHarness.ctx as any);
+		expect(defaultResult.isError).not.toBe(true);
+		expect(defaultHarness.getLastOverlayOptions()).toMatchObject({ command: "codex" });
+
+		const falseOverrideHarness = await setupExtensionHarness({ spawn: { defaultAgent: "codex", worktree: true } });
+		const falseOverrideTool = falseOverrideHarness.getTool();
+		expect(falseOverrideTool).toBeTruthy();
+		const falseOverrideResult = await falseOverrideTool!.execute("call-2", {
+			spawn: { worktree: false },
+			mode: "interactive",
+		}, undefined, undefined, falseOverrideHarness.ctx as any);
+		expect(falseOverrideResult.isError).not.toBe(true);
+		expect(falseOverrideHarness.getLastOverlayOptions()).toMatchObject({ command: "codex", cwd: "/tmp/project" });
+	});
+
+	it("interactive_shell accepts serialized intentional spawn requests", async () => {
+		const harness = await setupExtensionHarness();
+		const tool = harness.getTool();
+		expect(tool).toBeTruthy();
+
+		const result = await tool!.execute("call-1", {
+			spawn: { agent: "codex", mode: "fresh", worktree: false, prompt: "" },
+			mode: "interactive",
+		}, undefined, undefined, harness.ctx as any);
+
+		expect(result.isError).not.toBe(true);
+		expect(harness.getLastOverlayOptions()).toMatchObject({ command: "codex" });
+	});
+
+	it("interactive_shell structured spawn uses the shared resolver", async () => {
+		const harness = await setupExtensionHarness({
+			spawn: { defaultAgent: "pi", commands: { codex: "/opt/codex/bin/codex" } },
+		});
+		const tool = harness.getTool();
+		expect(tool).toBeTruthy();
+
+		const result = await tool!.execute("call-1", {
+			spawn: { agent: "codex" },
+			mode: "interactive",
+		}, undefined, undefined, harness.ctx as any);
+
+		expect(harness.custom).toHaveBeenCalledTimes(1);
+		expect(harness.getLastOverlayOptions()).toMatchObject({
+			command: "/opt/codex/bin/codex",
+			reason: "spawn codex (fresh session)",
+			mode: "interactive",
+		});
+		expect(harness.getLastOverlayOptions()?.sessionId).toBeTruthy();
+		expect(result.content[0].text).toContain("Interactive session started:");
+		expect(result.content[0].text).toContain("input: \"...\", submit: true");
+		expect(result.details.sessionId).toBe(harness.getLastOverlayOptions()?.sessionId);
+	});
+
+	it("interactive_shell defaults to an agent-controllable interactive session id", async () => {
+		const harness = await setupExtensionHarness();
+		const tool = harness.getTool();
+		expect(tool).toBeTruthy();
+
+		const result = await tool!.execute("call-1", {
+			command: "pi",
+		}, undefined, undefined, harness.ctx as any);
+
+		expect(result.isError).not.toBe(true);
+		expect(result.content[0].text).toContain("Interactive session started:");
+		expect(result.content[0].text).toContain("interactive_shell({ sessionId:");
+		expect(result.content[0].text).toContain("submit: true");
+		expect(result.details.mode).toBe("interactive");
+		expect(result.details.sessionId).toBe(harness.getLastOverlayOptions()?.sessionId);
+		expect(harness.getLastOverlayOptions()).toMatchObject({ command: "pi", mode: "interactive" });
+	});
+
+	it("interactive_shell structured spawn supports native startup prompts", async () => {
+		const harness = await setupExtensionHarness();
+		const tool = harness.getTool();
+		expect(tool).toBeTruthy();
+
+		const result = await tool!.execute("call-1", {
+			spawn: { agent: "claude", prompt: "review the diffs" },
+			mode: "dispatch",
+		}, undefined, undefined, harness.ctx as any);
+
+		expect(harness.getLastOverlayOptions()).toMatchObject({
+			command: "claude 'review the diffs'",
+			reason: "spawn claude (fresh session)",
+		});
+		expect(result.content[0].text).toContain("Session dispatched");
+	});
+
+	it("interactive_shell structured spawn launches cursor prompts through the agent executable", async () => {
+		const harness = await setupExtensionHarness();
+		const tool = harness.getTool();
+		expect(tool).toBeTruthy();
+
+		const result = await tool!.execute("call-1", {
+			spawn: { agent: "cursor", prompt: "review the diffs" },
+			mode: "dispatch",
+		}, undefined, undefined, harness.ctx as any);
+
+		expect(harness.getLastOverlayOptions()).toMatchObject({
+			command: "agent --model composer-2-fast 'review the diffs'",
+			reason: "spawn cursor (fresh session)",
+		});
+		expect(result.content[0].text).toContain("Session dispatched");
+	});
+
+	it("interactive_shell structured spawn keeps the same pi-only fork rule", async () => {
+		const harness = await setupExtensionHarness();
+		const tool = harness.getTool();
+		expect(tool).toBeTruthy();
+
+		const result = await tool!.execute("call-1", {
+			spawn: { agent: "claude", mode: "fork" },
+			mode: "interactive",
+		}, undefined, undefined, harness.ctx as any);
+
+		expect(result.isError).toBe(true);
+		expect(result.content[0].text).toBe("Cannot fork claude. Fork is only supported for pi sessions.");
+	});
+
+	it("interactive_shell preserves the full missing-input guidance for new sessions", async () => {
+		const harness = await setupExtensionHarness();
+		const tool = harness.getTool();
+		expect(tool).toBeTruthy();
+
+		const result = await tool!.execute("call-1", {}, undefined, undefined, harness.ctx as any);
+		expect(result.isError).toBe(true);
+		expect(result.content[0].text).toBe("One of 'command', 'spawn', 'sessionId', 'attach', 'listBackground', or 'dismissBackground' is required.");
+	});
+
+	it("/spawn forwards transfer output back into the main agent conversation", async () => {
+		const harness = await setupExtensionHarness();
+		harness.setCustomResult({
+			exitCode: 0,
+			backgrounded: false,
+			cancelled: false,
+			transferred: {
+				lines: ["line 1", "line 2"],
+				totalLines: 2,
+				truncated: false,
+			},
+		});
+		const spawn = harness.commands.get("spawn");
+		expect(spawn).toBeDefined();
+
+		await spawn!.handler("", harness.ctx as any);
+		expect(harness.pi.sendMessage).toHaveBeenCalledWith(expect.objectContaining({
+			customType: "interactive-shell-transfer",
+			display: true,
+			content: expect.stringContaining("Interactive shell output transferred (2 lines):"),
+		}), { triggerTurn: true });
+	});
+});
