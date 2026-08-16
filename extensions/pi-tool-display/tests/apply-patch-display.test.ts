@@ -113,6 +113,51 @@ test("single-file apply_patch results render through the existing edit diff engi
 	assert.doesNotMatch(rendered, /update: src\/example\.ts/);
 });
 
+test("collapsed apply_patch previews keep late canonical changes visible", () => {
+	const diff = Array.from({ length: 70 }, (_, index) => {
+		const lineNumber = index + 1;
+		if (lineNumber === 40) {
+			return [
+				"-40 export const target = 'before';",
+				"+40 export const target = 'after';",
+			];
+		}
+		return [` ${String(lineNumber).padStart(2, " ")} export const unchanged${lineNumber} = true;`];
+	}).flat().join("\n");
+	const result = {
+		content: [{ type: "text", text: "update: src/late-change.ts" }],
+		details: {
+			preview: {
+				files: [createPreviewFile("src/late-change.ts", diff)],
+				added: 1,
+				removed: 1,
+			},
+			result: { appliedFiles: ["src/late-change.ts"], failures: [], hasPartialSuccess: false },
+		},
+	};
+
+	for (const diffViewMode of ["split", "unified"] as const) {
+		const rendered = renderText(
+			renderApplyPatchResult(
+				result,
+				{ expanded: false, isPartial: false },
+				buildConfig({ diffViewMode, diffCollapsedLines: 24, diffWordWrap: true }),
+				identityTheme,
+				{ cwd: "/workspace" },
+			),
+			160,
+		);
+
+		assert.match(rendered, /before/, `${diffViewMode} preview should show removed text`);
+		assert.match(rendered, /after/, `${diffViewMode} preview should show added text`);
+		assert.doesNotMatch(rendered, /unchanged1 = true/, `${diffViewMode} preview should focus on the change`);
+		assert.match(rendered, /Ctrl\+O to expand/);
+		if (diffViewMode === "split") {
+			assert.match(rendered, /\bold\b.*\bnew\b/, "split preview should preserve its column headers");
+		}
+	}
+});
+
 test("multi-file apply_patch results label sections and share the collapsed line budget", () => {
 	const longDiff = (prefix: string): string => [
 		...Array.from({ length: 8 }, (_, index) => `-${index + 1} ${prefix}-old-${index + 1}`),

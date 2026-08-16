@@ -64,6 +64,7 @@ interface DiffStats {
 interface RenderedRow {
 	text: string;
 	hunkIndex: number | null;
+	isChanged: boolean;
 }
 
 interface SplitDiffRow {
@@ -697,6 +698,7 @@ function formatMetaEntryRows(entry: DiffMetaEntry, width: number, theme: DiffThe
 	return lines.map((line) => ({
 		text: mapColor(line),
 		hunkIndex: entry.kind === "file" ? null : entry.hunkIndex || null,
+		isChanged: false,
 	}));
 }
 
@@ -1589,6 +1591,7 @@ function pushDiffLineRows(rows: RenderedRow[], lines: string[], entry: DiffLineE
 		...lines.map((text) => ({
 			text,
 			hunkIndex: entry.hunkIndex || null,
+			isChanged: entry.lineKind !== "context",
 		})),
 	);
 }
@@ -1796,10 +1799,12 @@ function renderSplit(
 	output.push({
 		text: `${renderSplitTopBorderCell(leftWidth, splitLineNumberWidth, theme, indicatorMode, hashlineGutter)}${topSeparator}${renderSplitTopBorderCell(rightWidth, splitLineNumberWidth, theme, indicatorMode, hashlineGutter)}`,
 		hunkIndex: null,
+		isChanged: false,
 	});
 	output.push({
 		text: `${renderSplitHeaderCell("old", leftWidth, splitLineNumberWidth, theme, indicatorMode, hashlineGutter)}${separator}${renderSplitHeaderCell("new", rightWidth, splitLineNumberWidth, theme, indicatorMode, hashlineGutter)}`,
 		hunkIndex: null,
+		isChanged: false,
 	});
 
 	for (const row of rows) {
@@ -1838,10 +1843,12 @@ function renderSplit(
 		);
 
 		const rowCount = Math.max(leftCells.length, rightCells.length);
+		const isChanged = (row.left !== undefined && row.left.lineKind !== "context")
+			|| (row.right !== undefined && row.right.lineKind !== "context");
 		for (let index = 0; index < rowCount; index++) {
 			const leftCell = leftCells[index] ?? renderSplitBlankCell(leftWidth, splitLineNumberWidth, theme, indicatorMode, hashlineGutter);
 			const rightCell = rightCells[index] ?? renderSplitBlankCell(rightWidth, splitLineNumberWidth, theme, indicatorMode, hashlineGutter);
-			output.push({ text: `${leftCell}${separator}${rightCell}`, hunkIndex: row.hunkIndex });
+			output.push({ text: `${leftCell}${separator}${rightCell}`, hunkIndex: row.hunkIndex, isChanged });
 		}
 	}
 
@@ -1880,7 +1887,7 @@ function buildDiffSummaryBasePieces(stats: DiffStats, theme: DiffTheme): string[
 function renderHeaderRows(stats: DiffStats, mode: Exclude<DiffPresentationMode, "summary">, width: number, theme: DiffTheme): RenderedRow[] {
 	if (mode === "compact") {
 		const summary = buildDiffSummaryBasePieces(stats, theme).join(" ");
-		return [{ text: stabilizeBackgroundResets(truncateToWidth(summary, width)), hunkIndex: null }];
+		return [{ text: stabilizeBackgroundResets(truncateToWidth(summary, width)), hunkIndex: null, isChanged: false }];
 	}
 
 	const summaryPieces = mode === "split"
@@ -1898,18 +1905,18 @@ function renderHeaderRows(stats: DiffStats, mode: Exclude<DiffPresentationMode, 
 	const summary = summaryPieces.join(mode === "split" ? " " : theme.fg("muted", " • "));
 	const meter = renderDiffStatBar(stats, width, theme);
 	if (!meter) {
-		return [{ text: stabilizeBackgroundResets(truncateToWidth(summary, width)), hunkIndex: null }];
+		return [{ text: stabilizeBackgroundResets(truncateToWidth(summary, width)), hunkIndex: null, isChanged: false }];
 	}
 
 	const meterSeparator = " ";
 	const meterWidth = visibleWidth(meterSeparator) + visibleWidth(meter);
 	if (meterWidth >= width) {
-		return [{ text: stabilizeBackgroundResets(truncateToWidth(summary, width)), hunkIndex: null }];
+		return [{ text: stabilizeBackgroundResets(truncateToWidth(summary, width)), hunkIndex: null, isChanged: false }];
 	}
 
 	const summaryWidth = Math.max(0, width - meterWidth);
 	const fittedSummary = truncateToWidth(summary, summaryWidth);
-	return [{ text: stabilizeBackgroundResets(`${fittedSummary}${meterSeparator}${meter}`), hunkIndex: null }];
+	return [{ text: stabilizeBackgroundResets(`${fittedSummary}${meterSeparator}${meter}`), hunkIndex: null, isChanged: false }];
 }
 
 function renderDiffFrameLine(width: number, theme: DiffTheme): string {
@@ -1923,6 +1930,55 @@ function renderDiffFrameLine(width: number, theme: DiffTheme): string {
 function renderDiffSpacerLine(width: number): string {
 	const safeWidth = Math.max(0, width);
 	return safeWidth > 0 ? " ".repeat(safeWidth) : "";
+}
+
+function selectCollapsedRows(rows: RenderedRow[], limit: number): RenderedRow[] {
+	const head = rows.slice(0, limit);
+	const firstChangedIndex = rows.findIndex((row) => row.isChanged);
+	if (firstChangedIndex === -1) {
+		return head;
+	}
+
+	let changedRunEnd = firstChangedIndex + 1;
+	while (changedRunEnd < rows.length && rows[changedRunEnd]?.isChanged === true) {
+		changedRunEnd++;
+	}
+	if (changedRunEnd <= head.length) {
+		return head;
+	}
+
+	let structuralPrefixLength = 0;
+	while (structuralPrefixLength < rows.length && rows[structuralPrefixLength]?.hunkIndex === null) {
+		structuralPrefixLength++;
+	}
+	const preservedPrefixLength = Math.min(structuralPrefixLength, Math.max(0, limit - 1));
+	const windowBudget = limit - preservedPrefixLength;
+	if (windowBudget <= 0) {
+		return head;
+	}
+
+	let windowStart = firstChangedIndex;
+	let windowEnd = Math.min(changedRunEnd, windowStart + windowBudget);
+	while (windowEnd - windowStart < windowBudget) {
+		const canExpandBefore = windowStart > structuralPrefixLength;
+		const canExpandAfter = windowEnd < rows.length;
+		if (!canExpandBefore && !canExpandAfter) {
+			break;
+		}
+
+		const beforeContext = firstChangedIndex - windowStart;
+		const afterContext = Math.max(0, windowEnd - changedRunEnd);
+		if (canExpandBefore && (!canExpandAfter || beforeContext <= afterContext)) {
+			windowStart--;
+		} else {
+			windowEnd++;
+		}
+	}
+
+	return [
+		...rows.slice(0, preservedPrefixLength),
+		...rows.slice(windowStart, windowEnd),
+	];
 }
 
 function applyLineLimit(
@@ -1945,7 +2001,7 @@ function applyLineLimit(
 		return rows.map((row) => clampDiffLineToWidth(row.text, width));
 	}
 
-	const shown = rows.slice(0, limit);
+	const shown = expanded ? rows.slice(0, limit) : selectCollapsedRows(rows, limit);
 	const remaining = rows.length - shown.length;
 	const visibleHunks = new Set(
 		shown
@@ -2478,7 +2534,7 @@ export function renderWriteDiffResult(
 				width: safeWidth, theme, inlineHighlights: data.inlineHighlights, palette, highlightLine, containerBgAnsi, wordWrap, indicatorMode, showHashlineAnchors: false,
 			};
 			const bodyRows: RenderedRow[] = data.entries.length === 0
-				? [{ text: theme.fg("muted", "(empty file)"), hunkIndex: null }]
+				? [{ text: theme.fg("muted", "(empty file)"), hunkIndex: null, isChanged: false }]
 				: mode === "split"
 					? renderSplit(
 						data.splitRows,

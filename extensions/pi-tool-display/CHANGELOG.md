@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Deferred built-in display overrides until Pi exposes runtime ownership metadata, preserving customized tool descriptions, parameter schemas, prompt guidelines, and host-exposed prompt snippets while leaving externally owned tools untouched.
+- Centered collapsed diff previews on the first changed block so full-file canonical diffs cannot hide the actual edit behind a long unchanged prefix.
 
 ## [0.5.1] - 2026-08-16
 
