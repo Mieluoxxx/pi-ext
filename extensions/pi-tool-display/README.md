@@ -25,6 +25,7 @@ OpenCode-style tool rendering for the [Pi coding agent](https://pi.dev).
 - **MCP-aware rendering** with hidden, summary, and preview modes
 - **Opt-in custom tool overrides** for noisy extension tools, defaulting to generic rendering unless `kind: "mcp"` is selected
 - **Adaptive edit/write diffs** with split or unified layouts, syntax highlighting, inline emphasis, and narrow-pane width clamping
+- **Automatic `apply_patch` diffs** that reuse the edit renderer for structured single-file and multi-file patch previews
 - **Workspace-scoped projected pending edit/write previews** that show `pending edit`, `pending overwrite`, and `pending create` diffs while partial tool calls are still streaming
 - **Progressive collapsed diff hints** that shorten automatically on small terminal widths instead of overflowing
 - **Hashline-anchor diff gutters** that preserve `LINE#HASH` labels from anchored read/edit output when those lines are rendered in diffs
@@ -293,6 +294,14 @@ While tool arguments are still streaming, partial `edit` and `write` calls can s
 
 When diff input includes Pi anchored read lines such as `12#AB:content`, the renderer treats the anchor as line metadata and displays the `LINE#HASH` label in the gutter while keeping the content aligned for split, unified, and compact diff layouts.
 
+### `apply_patch` diffs
+
+The exact `apply_patch` tool name is recognized at Pi's native tool-rendering boundary, so load order does not matter and the originating extension keeps ownership of execution, freeform grammar, prompt metadata, and result data. Structured `details.preview.files` payloads are rendered through the same adaptive diff engine as `edit`.
+
+Single-file patches use the normal edit layout directly. Multi-file patches render one labeled diff section per file and share the configured collapsed and expanded line budgets across those sections. Partial results show progress, while failed or partially applied patches mark failed files and clarify that the preview can include intended changes that were not applied. When structured preview data is unavailable, the renderer falls back to the tool's text result.
+
+Set `customToolOverrides.apply_patch` to `false` to keep the originating tool's renderer. An enabled explicit custom override still takes precedence over automatic `apply_patch` rendering.
+
 ### Write summaries
 
 When content is available, `write` call summaries include line count and byte size information inline so you can quickly see the size of the pending write before expanding the result.
@@ -362,6 +371,7 @@ extensions/pi-tool-display/
 ├── src/
 │   ├── index.ts                     # Bootstrap and extension registration
 │   ├── capabilities.ts              # MCP/RTK capability detection
+│   ├── apply-patch-display.ts       # apply_patch call/result adapter for edit-style diffs
 │   ├── config-modal.ts              # /tool-display settings UI and command handling
 │   ├── config-store.ts              # Config load/save and normalization
 │   ├── disposable.ts                # Reload-safe cleanup registry for tool overrides, patches, and timers

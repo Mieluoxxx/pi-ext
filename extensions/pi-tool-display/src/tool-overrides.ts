@@ -25,6 +25,7 @@ import {
 import { Container, Spacer, Text } from "@earendil-works/pi-tui";
 import { resolvePiAgentDir } from "./agent-dir.js";
 import { ANSI_SGR_PATTERN, STYLE_RESET_PARAMS } from "./ansi-utils.js";
+import { renderApplyPatchCall, renderApplyPatchResult } from "./apply-patch-display.js";
 import { renderBashCall } from "./bash-display.js";
 import { logToolDisplayDebug } from "./debug-logger.js";
 import { registerCleanup } from "./disposable.js";
@@ -1595,7 +1596,7 @@ function renderCustomToolResult(
 }
 
 interface NativeToolDisplayPresentation {
-  kind: "mcp" | "generic";
+  kind: "apply_patch" | "mcp" | "generic";
   toolName: string;
   toolLabel: string;
   customOverride?: CustomToolOverrideConfig;
@@ -1621,6 +1622,17 @@ function resolveNativeToolDisplayPresentation(
   }
 
   const definition = toRecord(toRecord(instance).toolDefinition);
+  if (toolName === "apply_patch") {
+    if (customOverride && !customOverride.enabled) {
+      return undefined;
+    }
+    return {
+      kind: "apply_patch",
+      toolName,
+      toolLabel: getTextField(definition, "label") || "apply_patch",
+    };
+  }
+
   const candidate = { ...definition, name: toolName };
   if (toolName !== "mcp" && toolName !== "mcpScript" && !isMcpToolCandidate(candidate)) {
     return undefined;
@@ -1641,13 +1653,17 @@ export function createMcpToolExecutionPatchOptions(
       return resolveNativeToolDisplayPresentation(instance, getConfig()) !== undefined;
     },
     useDefaultShell(instance) {
-      return resolveNativeToolDisplayPresentation(instance, getConfig())?.kind === "mcp";
+      const kind = resolveNativeToolDisplayPresentation(instance, getConfig())?.kind;
+      return kind === "apply_patch" || kind === "mcp";
     },
     createCallRenderer(instance) {
       return (args: unknown, theme: RenderTheme, context?: ToolRenderContextLike) => {
         const presentation = resolveNativeToolDisplayPresentation(instance, getConfig());
         if (!presentation) {
           return textResult("");
+        }
+        if (presentation.kind === "apply_patch") {
+          return renderApplyPatchCall(args, theme, context);
         }
         if (presentation.kind === "generic") {
           return formatGenericToolCallLine(presentation.toolName, args, theme);
@@ -1669,6 +1685,9 @@ export function createMcpToolExecutionPatchOptions(
         context?: ToolRenderContextLike,
       ) => {
         const presentation = resolveNativeToolDisplayPresentation(instance, getConfig());
+        if (presentation?.kind === "apply_patch") {
+          return renderApplyPatchResult(result, options, getConfig(), theme, context);
+        }
         if (presentation?.customOverride) {
           return renderCustomToolResult(
             result,
@@ -1694,7 +1713,7 @@ function installNativeMcpToolExecutionPatch(getConfig: ConfigGetter): void {
   const prototype = getToolExecutionPrototype();
   const options = createMcpToolExecutionPatchOptions(getConfig);
   if (!patchMcpToolExecutionPrototype(prototype, options)) {
-    logToolDisplayDebug("MCP tool execution renderer patch was not installed because Pi's renderer shape was incompatible.");
+    logToolDisplayDebug("Native tool execution renderer patch was not installed because Pi's renderer shape was incompatible.");
     return;
   }
   registerCleanup(() => unregisterMcpToolExecutionPatch(prototype, options));
