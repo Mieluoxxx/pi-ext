@@ -286,6 +286,8 @@ Debug logging is disabled by default. Set `debug` to `true` in the extension roo
 
 ## Rendering notes
 
+Confirmed renderer constraints and deferred improvements are tracked in [Known Limitations](docs/known-limitations.md).
+
 ### Edit and write diffs
 
 `edit` and `write` results use the same diff renderer. In `auto` mode the extension chooses split or unified layout based on available width. On narrow panes it clamps rendered lines and shortens collapsed hint text so the diff stays readable instead of spilling past the terminal width.
