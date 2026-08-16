@@ -128,6 +128,8 @@ import { decorateToolForDisplay, decorateMcpToolForDisplay } from "@moguw/pi-too
 | `summary` | Shows only line count (e.g., "↳ 3 lines returned") — no output displayed |
 | `preview` | Shows actual output lines using `previewLines` limit |
 
+Collapsed Bash calls show at most 10 rendered command rows with a muted truncation hint. Expanded calls continue to show the full command.
+
 ## Configuration
 
 Runtime configuration is stored at:

@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Integrated the package into `Mieluoxxx/pi-ext` as the independently publishable `@moguw/pi-tool-display` workspace while preserving upstream history and attribution.
+- Limited collapsed Bash command previews to 10 rendered rows with a muted truncation hint while keeping the full command available in expanded tool calls.
 
 ### Fixed
 - Replaced ineffective cross-extension MCP definition mutation with a reload-safe `ToolExecutionComponent` renderer patch, so `mcp`, `mcpScript`, direct wrappers, and configured custom MCP tools use Pi's default result box and shared tool-display renderers.

@@ -15,6 +15,7 @@ interface BashCallRenderTheme {
 interface BashCallRenderContextLike {
 	executionStarted: boolean;
 	isPartial: boolean;
+	expanded?: boolean;
 	invalidate(): void;
 	lastComponent?: unknown;
 	state?: unknown;
@@ -128,6 +129,117 @@ test("renderBashCall displays multiline command", () => {
 		makeContext(),
 	);
 	assert.ok(renderedText(text).includes("echo hello\necho world"));
+});
+
+test("renderBashCall limits collapsed multiline commands to ten command lines", () => {
+	const command = Array.from({ length: 15 }, (_, index) => `echo line ${index + 1}`).join("\n");
+	const text = renderBashCall({ command }, createPassThroughTheme(), makeContext());
+	const lines = renderedText(text).split("\n");
+
+	assert.equal(lines.length, 11);
+	assert.equal(lines[0], "$ echo line 1");
+	assert.equal(lines[9], "echo line 10");
+	assert.equal(lines[10], "… command preview truncated");
+	assert.doesNotMatch(lines.join("\n"), /echo line 11/);
+});
+
+test("renderBashCall shows the full multiline command when expanded", () => {
+	const command = Array.from({ length: 15 }, (_, index) => `echo line ${index + 1}`).join("\n");
+	const text = renderBashCall(
+		{ command },
+		createPassThroughTheme(),
+		makeContext({ expanded: true }),
+	);
+	const lines = renderedText(text).split("\n");
+
+	assert.equal(lines.length, 15);
+	assert.equal(lines[14], "echo line 15");
+	assert.doesNotMatch(lines.join("\n"), /command preview truncated/);
+});
+
+test("renderBashCall does not add a hint for exactly ten command lines", () => {
+	const command = Array.from({ length: 10 }, (_, index) => `echo line ${index + 1}`).join("\n");
+	const text = renderBashCall({ command }, createPassThroughTheme(), makeContext());
+	const lines = renderedText(text).split("\n");
+
+	assert.equal(lines.length, 10);
+	assert.equal(lines[9], "echo line 10");
+	assert.doesNotMatch(lines.join("\n"), /command preview truncated/);
+});
+
+test("renderBashCall counts CRLF command lines when collapsed", () => {
+	const command = Array.from({ length: 12 }, (_, index) => `echo line ${index + 1}`).join("\r\n");
+	const text = renderBashCall({ command }, createPassThroughTheme(), makeContext());
+	const output = renderedText(text);
+
+	assert.doesNotMatch(output, /\r/);
+	assert.equal(output.split("\n").length, 11);
+	assert.match(output, /… command preview truncated$/);
+});
+
+test("renderBashCall renders the collapsed command hint with muted styling", () => {
+	const command = Array.from({ length: 11 }, (_, index) => `echo line ${index + 1}`).join("\n");
+	const text = renderBashCall({ command }, createAnsiTheme(), makeContext());
+
+	assert.match(renderedText(text), /\x1b\[90m… command preview truncated\x1b\[0m$/);
+});
+
+test("renderBashCall limits wrapped collapsed commands to ten visible rows", () => {
+	const command = Array.from(
+		{ length: 6 },
+		(_, index) => `printf 'line ${index + 1}: ${"x".repeat(70)}'`,
+	).join("\n");
+	const collapsed = renderBashCall({ command }, createPassThroughTheme(), makeContext());
+	const collapsedLines = collapsed.render(40).map((line) => line.trimEnd());
+
+	assert.equal(collapsedLines.length, 11);
+	assert.equal(collapsedLines[10], "… command preview truncated");
+
+	const expanded = renderBashCall(
+		{ command },
+		createPassThroughTheme(),
+		makeContext({ expanded: true, lastComponent: collapsed }),
+	);
+	const expandedLines = expanded.render(40).map((line) => line.trimEnd());
+
+	assert.equal(expanded, collapsed);
+	assert.ok(expandedLines.length > 10);
+	assert.doesNotMatch(expandedLines.join("\n"), /command preview truncated/);
+});
+
+test("renderBashCall keeps a running command expanded across spinner ticks", async () => {
+	const command = Array.from(
+		{ length: 6 },
+		(_, index) => `printf 'line ${index + 1}: ${"x".repeat(70)}'`,
+	).join("\n");
+	const state: Record<string, unknown> = {};
+	const { text, stop } = createSpinningBashCall({ command }, state);
+
+	try {
+		const expanded = renderBashCall(
+			{ command },
+			createPassThroughTheme(),
+			makeContext({
+				executionStarted: true,
+				isPartial: true,
+				expanded: true,
+				state,
+				lastComponent: text,
+			}),
+		);
+		assert.equal(expanded, text);
+		const beforeTick = expanded.render(40);
+		assert.ok(beforeTick.length > 11);
+		assert.doesNotMatch(beforeTick.join("\n"), /command preview truncated/);
+
+		await new Promise((resolve) => setTimeout(resolve, 250));
+
+		const afterTick = expanded.render(40);
+		assert.ok(afterTick.length > 11);
+		assert.doesNotMatch(afterTick.join("\n"), /command preview truncated/);
+	} finally {
+		stop();
+	}
 });
 
 test("renderBashCall appends timeout suffix when timeout is provided", () => {
