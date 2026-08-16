@@ -2018,48 +2018,76 @@ export function registerToolDisplayOverrides(
   const writeExecutionMetaByToolCallId = new Map<string, WriteExecutionMeta>();
   const registeredBuiltInToolOverrides = new Set<BuiltInToolOverrideName>();
 
-  const isExternallyOwnedBuiltInTool = (toolName: BuiltInToolOverrideName): boolean => {
-    const allTools = tryGetAllTools(pi, "Built-in tool override ownership discovery unavailable during extension load; registering renderer for pre-bind history rendering.");
-    if (!allTools) {
-      return false;
-    }
-
-    const currentOwner = allTools.find((tool) => getTextField(tool, "name") === toolName);
-    const sourceInfo = toRecord(toRecord(currentOwner).sourceInfo);
-    const source = getTextField(sourceInfo, "source");
-    if (currentOwner && source && source !== "builtin") {
-      logToolDisplayDebug("Skipped built-in tool display override because another tool owner is active.", {
-        toolName,
-        source,
-        path: getTextField(sourceInfo, "path") ?? "unknown",
-      });
-      return true;
-    }
-
-    return false;
-  };
-
   const registerIfOwned = (
     toolName: BuiltInToolOverrideName,
-    register: () => void,
+    register: (currentOwner: unknown) => void,
   ): void => {
-    if (
-      registeredBuiltInToolOverrides.has(toolName) ||
-      !getConfig().registerToolOverrides[toolName] ||
-      isExternallyOwnedBuiltInTool(toolName)
-    ) {
+    if (registeredBuiltInToolOverrides.has(toolName) || !getConfig().registerToolOverrides[toolName]) {
       return;
     }
 
-    register();
+    const allTools = tryGetAllTools(
+      pi,
+      "Built-in tool ownership metadata is not available yet; deferring the display override.",
+    );
+    if (!allTools) {
+      return;
+    }
+
+    const currentOwner = allTools.find((tool) => getTextField(tool, "name") === toolName);
+    if (!currentOwner) {
+      logToolDisplayDebug("Skipped built-in tool display override because no current owner is active.", {
+        toolName,
+      });
+      return;
+    }
+
+    const sourceInfo = toRecord(toRecord(currentOwner).sourceInfo);
+    const source = getTextField(sourceInfo, "source");
+    if (source !== "builtin") {
+      logToolDisplayDebug("Skipped built-in tool display override because another tool owner is active.", {
+        toolName,
+        source: source ?? "unknown",
+        path: getTextField(sourceInfo, "path") ?? "unknown",
+      });
+      return;
+    }
+
+    register(currentOwner);
     registeredBuiltInToolOverrides.add(toolName);
   };
 
-  function createBuiltinToolBase(toolName: keyof BuiltInTools) {
+  function createBuiltinToolPromptBase(toolName: keyof BuiltInTools, currentOwner: unknown) {
+    const owner = toRecord(currentOwner);
+    const fallbackPromptMetadata = builtInPromptMetadata[toolName];
+    const runtimePromptMetadata = extractPromptMetadata(owner);
+    // Current Pi getAllTools() omits promptSnippet. Preserve it when a host
+    // exposes it, otherwise fall back to the matching built-in definition.
+    const hasRuntimePromptSnippet = Object.prototype.hasOwnProperty.call(owner, "promptSnippet");
+    const hasRuntimePromptGuidelines = Object.prototype.hasOwnProperty.call(owner, "promptGuidelines");
+    const runtimeDescription = owner.description;
+
     return {
-      description: bootstrapTools[toolName].description,
-      ...builtInPromptMetadata[toolName],
-      parameters: clonedParameters[toolName],
+      description:
+        typeof runtimeDescription === "string" && runtimeDescription.trim().length > 0
+          ? runtimeDescription
+          : bootstrapTools[toolName].description,
+      promptSnippet: hasRuntimePromptSnippet
+        ? runtimePromptMetadata.promptSnippet
+        : fallbackPromptMetadata.promptSnippet,
+      promptGuidelines: hasRuntimePromptGuidelines
+        ? runtimePromptMetadata.promptGuidelines
+        : fallbackPromptMetadata.promptGuidelines,
+      parameters:
+        owner.parameters !== undefined
+          ? cloneToolParameters(owner.parameters)
+          : clonedParameters[toolName],
+    };
+  }
+
+  function createBuiltinToolBase(toolName: keyof BuiltInTools, currentOwner: unknown) {
+    return {
+      ...createBuiltinToolPromptBase(toolName, currentOwner),
       prepareArguments: getToolPrepareArguments(bootstrapTools[toolName]),
       async execute(toolCallId: string, params: Record<string, unknown>, signal: unknown, onUpdate: unknown, ctx: { cwd: string }) {
         return getBuiltInTools(ctx.cwd)[toolName].execute(
@@ -2087,11 +2115,11 @@ export function registerToolDisplayOverrides(
     return { scope: getSearchScope(args), limitSuffix: args.limit !== undefined ? ` (limit ${args.limit})` : "" };
   };
 
-  registerIfOwned("read", () => {
+  const registerReadOverride = (): void => registerIfOwned("read", (currentOwner) => {
     registerRuntimeTool(pi, {
       name: "read",
       label: "read",
-      ...createBuiltinToolBase("read"),
+      ...createBuiltinToolBase("read", currentOwner),
       renderCall(args, theme) {
         return renderReadDisplayCall(args, theme);
       },
@@ -2101,11 +2129,11 @@ export function registerToolDisplayOverrides(
     });
   });
 
-  registerIfOwned("grep", () => {
+  const registerGrepOverride = (): void => registerIfOwned("grep", (currentOwner) => {
     registerRuntimeTool(pi, {
       name: "grep",
     label: "grep",
-    ...createBuiltinToolBase("grep"),
+    ...createBuiltinToolBase("grep", currentOwner),
     renderCall(args, theme) {
       const scope = getSearchScope(args);
       const globSuffix = args.glob ? ` (${args.glob})` : "";
@@ -2119,11 +2147,11 @@ export function registerToolDisplayOverrides(
     });
   });
 
-  registerIfOwned("find", () => {
+  const registerFindOverride = (): void => registerIfOwned("find", (currentOwner) => {
     registerRuntimeTool(pi, {
       name: "find",
-    label: "find",
-    ...createBuiltinToolBase("find"),
+      label: "find",
+    ...createBuiltinToolBase("find", currentOwner),
     renderCall(args, theme) {
       const { scope, limitSuffix } = buildSearchCallSuffix(args);
       return formatSearchCallLine("find", args.pattern as string, ` in ${scope}${limitSuffix}`, theme);
@@ -2134,11 +2162,11 @@ export function registerToolDisplayOverrides(
     });
   });
 
-  registerIfOwned("ls", () => {
+  const registerLsOverride = (): void => registerIfOwned("ls", (currentOwner) => {
     registerRuntimeTool(pi, {
       name: "ls",
-    label: "ls",
-    ...createBuiltinToolBase("ls"),
+      label: "ls",
+    ...createBuiltinToolBase("ls", currentOwner),
     renderCall(args, theme) {
       const { scope, limitSuffix } = buildSearchCallSuffix(args);
       return formatSearchCallLine("ls", scope, limitSuffix, theme);
@@ -2149,13 +2177,11 @@ export function registerToolDisplayOverrides(
     });
   });
 
-  registerIfOwned("edit", () => {
+  const registerEditOverride = (): void => registerIfOwned("edit", (currentOwner) => {
     registerRuntimeTool(pi, {
       name: "edit",
     label: "edit",
-    description: bootstrapTools.edit.description,
-    ...builtInPromptMetadata.edit,
-    parameters: clonedParameters.edit,
+    ...createBuiltinToolPromptBase("edit", currentOwner),
     renderShell: "default",
     prepareArguments: getToolPrepareArguments(bootstrapTools.edit),
     async execute(toolCallId, params, signal, onUpdate, ctx) {
@@ -2175,13 +2201,11 @@ export function registerToolDisplayOverrides(
     });
   });
 
-  registerIfOwned("write", () => {
+  const registerWriteOverride = (): void => registerIfOwned("write", (currentOwner) => {
     registerRuntimeTool(pi, {
       name: "write",
-    label: "write",
-    description: bootstrapTools.write.description,
-    ...builtInPromptMetadata.write,
-    parameters: clonedParameters.write,
+      label: "write",
+    ...createBuiltinToolPromptBase("write", currentOwner),
     prepareArguments: getToolPrepareArguments(bootstrapTools.write),
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       const previous = captureExistingWriteContent(ctx.cwd, params.path);
@@ -2251,11 +2275,11 @@ export function registerToolDisplayOverrides(
     });
   });
 
-  registerIfOwned("bash", () => {
+  const registerBashOverride = (): void => registerIfOwned("bash", (currentOwner) => {
     registerRuntimeTool(pi, {
       name: "bash",
-    label: "bash",
-    ...createBuiltinToolBase("bash"),
+      label: "bash",
+    ...createBuiltinToolBase("bash", currentOwner),
     renderCall(args, theme, context) {
       return renderBashCall(args, theme, context as never);
     },
@@ -2324,10 +2348,24 @@ export function registerToolDisplayOverrides(
     });
   });
 
+  const registerConfiguredBuiltInOverrides = (): void => {
+    registerReadOverride();
+    registerGrepOverride();
+    registerFindOverride();
+    registerLsOverride();
+    registerEditOverride();
+    registerWriteOverride();
+    registerBashOverride();
+  };
+
+  registerConfiguredBuiltInOverrides();
+
   pi.on("session_start", async () => {
     clearWriteExecutionMeta(writeExecutionMetaByToolCallId);
+    registerConfiguredBuiltInOverrides();
   });
   pi.on("before_agent_start", async () => {
     clearWriteExecutionMeta(writeExecutionMetaByToolCallId);
+    registerConfiguredBuiltInOverrides();
   });
 }

@@ -21,6 +21,15 @@ interface CapturedCommand {
   handler?: (...args: unknown[]) => unknown;
 }
 
+const BUILT_IN_TOOL_NAMES = ["read", "grep", "find", "ls", "bash", "edit", "write"] as const;
+
+function createBuiltInOwnerMetadata(): unknown[] {
+  return BUILT_IN_TOOL_NAMES.map((name) => ({
+    name,
+    sourceInfo: { source: "builtin", path: `<builtin:${name}>` },
+  }));
+}
+
 function createApiStub(
   overrides: Partial<{
     registerTool: (tool: unknown) => void;
@@ -53,7 +62,7 @@ function createApiStub(
       overrides.on?.(event, handler);
     },
     getAllTools(): unknown[] {
-      return overrides.getAllTools?.() ?? [];
+      return overrides.getAllTools?.() ?? createBuiltInOwnerMetadata();
     },
     getCommands(): Array<{ name: string }> {
       return overrides.getCommands?.() ?? [];
@@ -99,14 +108,9 @@ test("entry point registers built-in tool overrides", () => {
   toolDisplayExtension(api);
 
   const toolNames = capturedTools.map((t) => t.name);
-  // find, ls, write are registered immediately; read/grep/edit/bash are deferred
-  assert.ok(toolNames.includes("find"), "find tool override registered");
-  assert.ok(toolNames.includes("ls"), "ls tool override registered");
-  assert.ok(toolNames.includes("write"), "write tool override registered");
-
-  // Disabled tools (if config disables them) would not appear; the default
-  // config enables all, so we expect at least these 3 immediately.
-  assert.ok(toolNames.length >= 3, "at least 3 tool overrides registered immediately");
+  for (const name of ["find", "ls", "write"] as const) {
+    assert.ok(toolNames.includes(name), `${name} tool override registered`);
+  }
 });
 
 test("session_start handler refreshes capabilities and notifies pending errors", async () => {
@@ -215,7 +219,7 @@ test("graceful degradation: extension throws when on is missing", () => {
 });
 
 test("lifecycle events fire in expected order during a session lifecycle", async () => {
-  // Simulate the sequence: setup → before_agent_start → session_start
+  // Simulate the sequence: setup → session_start → before_agent_start
   const { api, capturedHandlers } = createApiStub();
 
   toolDisplayExtension(api);
@@ -231,11 +235,11 @@ test("lifecycle events fire in expected order during a session lifecycle", async
   assert.ok(sessionHandler, "session_start handler found");
 
   // Simulate a session lifecycle
-  await beforeHandler();
   await sessionHandler(
     {},
     { ui: { theme: { fg: (_c: string, t: string) => t }, notify: () => {} } },
   );
+  await beforeHandler();
 
   // Simulate message lifecycle for thinking labels
   if (messageUpdateHandler) {
@@ -340,8 +344,6 @@ test("overridden tools preserve promptSnippet and promptGuidelines from built-in
 
   const byName = new Map(capturedTools.map((t) => [t.name, t]));
 
-  // read (deferred) won't be registered immediately; it's deferred
-  // So we only check tools registered immediately
   for (const name of ["find", "ls", "write"] as const) {
     const tool = byName.get(name);
     assert.ok(tool, `${name} is registered`);

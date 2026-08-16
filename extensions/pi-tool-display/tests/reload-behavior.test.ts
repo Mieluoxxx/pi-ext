@@ -41,6 +41,24 @@ interface ToolLike {
   [key: string]: unknown;
 }
 
+interface ExtensionApiStubOptions {
+  initiallyBound?: boolean;
+}
+
+const BUILT_IN_TOOL_NAMES = ["read", "grep", "find", "ls", "bash", "edit", "write"] as const;
+
+function withDefaultBuiltInOwners(tools: unknown[] = []): unknown[] {
+  const names = new Set(
+    tools
+      .map((tool) => (tool as { name?: unknown }).name)
+      .filter((name): name is string => typeof name === "string"),
+  );
+  const defaults = BUILT_IN_TOOL_NAMES
+    .filter((name) => !names.has(name))
+    .map((name) => ({ name, sourceInfo: { source: "builtin", path: `<builtin:${name}>` } }));
+  return [...defaults, ...tools];
+}
+
 /**
  * Create a minimal ExtensionAPI stub that captures registrations for later
  * inspection. Mirrors the pattern from index-integration.test.ts.
@@ -77,7 +95,7 @@ function createApiStub(
       overrides.on?.(event, handler);
     },
     getAllTools(): unknown[] {
-      return overrides.getAllTools?.() ?? [];
+      return overrides.getAllTools?.() ?? withDefaultBuiltInOwners();
     },
     getCommands(): Array<{ name: string }> {
       return overrides.getCommands?.() ?? [];
@@ -89,15 +107,17 @@ function createApiStub(
 
 /**
  * Create a stub for registerToolDisplayOverrides tests that need event-driven
- * deferred registration (read/edit/grep deferral).
+ * registration after Pi binds runtime tool ownership metadata.
  */
-function createExtensionApiStub(allTools: unknown[] = []): {
+function createExtensionApiStub(allTools: unknown[] = [], options: ExtensionApiStubOptions = {}): {
   api: ExtensionAPI;
   registeredTools: ToolLike[];
   eventHandlers: Record<string, () => Promise<void> | void>;
+  bindRuntime(): void;
 } {
   const registeredTools: ToolLike[] = [];
   const eventHandlers: Record<string, () => Promise<void> | void> = {};
+  let runtimeBound = options.initiallyBound ?? true;
   const api = {
     registerTool(tool: ToolLike): void {
       registeredTools.push(tool);
@@ -106,11 +126,21 @@ function createExtensionApiStub(allTools: unknown[] = []): {
       eventHandlers[event] = handler;
     },
     getAllTools(): unknown[] {
-      return allTools;
+      if (!runtimeBound) {
+        throw new Error("Extension runtime not initialized");
+      }
+      return withDefaultBuiltInOwners(allTools);
     },
   } as unknown as ExtensionAPI;
 
-  return { api, registeredTools, eventHandlers };
+  return {
+    api,
+    registeredTools,
+    eventHandlers,
+    bindRuntime(): void {
+      runtimeBound = true;
+    },
+  };
 }
 
 /** Minimal theme stub for render calls. */
@@ -214,22 +244,27 @@ test("2: re-registered tools have renderCall and renderResult functions after re
   }
 });
 
-test("2: built-in tool overrides register before lifecycle events and re-register on reload", async () => {
-  const { api, registeredTools, eventHandlers } = createExtensionApiStub();
+test("2: built-in tool overrides register after runtime binding and re-register on reload", async () => {
+  const { api, registeredTools, eventHandlers, bindRuntime } = createExtensionApiStub([], {
+    initiallyBound: false,
+  });
 
   registerToolDisplayOverrides(api, () => DEFAULT_TOOL_DISPLAY_CONFIG);
-  const firstImmediate = registeredTools.map((t) => t.name);
+  assert.equal(registeredTools.length, 0, "tools wait for runtime ownership metadata");
 
-  for (const toolName of ["read", "edit", "grep", "bash"] as const) {
-    assert.ok(firstImmediate.includes(toolName), `${toolName} registered before lifecycle events`);
-  }
+  bindRuntime();
+  await eventHandlers.session_start?.();
+  assert.deepEqual(
+    registeredTools.map((tool) => tool.name).sort(),
+    [...BUILT_IN_TOOL_NAMES].sort(),
+  );
 
   const countBeforeLifecycle = registeredTools.length;
   await eventHandlers.before_agent_start?.();
   assert.equal(
     registeredTools.length,
     countBeforeLifecycle,
-    "before_agent_start does not duplicate already registered built-ins",
+    "before_agent_start does not duplicate registered built-ins",
   );
 
   registerToolDisplayOverrides(api, () => DEFAULT_TOOL_DISPLAY_CONFIG);

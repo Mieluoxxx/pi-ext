@@ -39,6 +39,10 @@ interface ToolEventHandlers {
 	before_agent_start?: () => Promise<void> | void;
 }
 
+interface ExtensionApiStubOptions {
+	initiallyBound?: boolean;
+}
+
 interface ExecutableToolLike extends RegisteredToolLike {
 	execute: (...args: unknown[]) => Promise<{ content?: Array<{ type: string; text?: string }> }>;
 }
@@ -59,25 +63,27 @@ function getTextOutput(result: { content?: Array<{ type: string; text?: string }
 		.join("");
 }
 
-function withDefaultReadEditOwners(tools: unknown[] = []): unknown[] {
+function withDefaultBuiltInOwners(tools: unknown[] = []): unknown[] {
 	const names = new Set(
 		tools
 			.map((tool) => (tool as { name?: unknown }).name)
 			.filter((name): name is string => typeof name === "string"),
 	);
-	const defaults = ["read", "edit"]
+	const defaults = ["read", "grep", "find", "ls", "bash", "edit", "write"]
 		.filter((name) => !names.has(name))
 		.map((name) => ({ name, sourceInfo: { source: "builtin", path: `<builtin:${name}>` } }));
 	return [...defaults, ...tools];
 }
 
-function createExtensionApiStub(allTools: unknown[] = []): {
+function createExtensionApiStub(allTools: unknown[] = [], options: ExtensionApiStubOptions = {}): {
 	api: ExtensionAPI;
 	registeredTools: RegisteredToolLike[];
 	eventHandlers: ToolEventHandlers;
+	bindRuntime(): void;
 } {
 	const registeredTools: RegisteredToolLike[] = [];
 	const eventHandlers: ToolEventHandlers = {};
+	let runtimeBound = options.initiallyBound ?? true;
 	const api = {
 		registerTool(tool: RegisteredToolLike): void {
 			registeredTools.push(tool);
@@ -86,11 +92,21 @@ function createExtensionApiStub(allTools: unknown[] = []): {
 			eventHandlers[event] = handler;
 		},
 		getAllTools(): unknown[] {
-			return withDefaultReadEditOwners(allTools);
+			if (!runtimeBound) {
+				throw new Error("Extension runtime not initialized");
+			}
+			return withDefaultBuiltInOwners(allTools);
 		},
 	} as unknown as ExtensionAPI;
 
-	return { api, registeredTools, eventHandlers };
+	return {
+		api,
+		registeredTools,
+		eventHandlers,
+		bindRuntime(): void {
+			runtimeBound = true;
+		},
+	};
 }
 
 test("registerToolDisplayOverrides copies built-in prompt metadata onto overridden tools", async () => {
@@ -126,7 +142,81 @@ test("registerToolDisplayOverrides copies built-in prompt metadata onto overridd
 	}
 });
 
-test("registerToolDisplayOverrides registers built-in display renderers during extension load for pre-bind history rendering", () => {
+test("registerToolDisplayOverrides preserves host-exposed customized built-in prompt metadata", () => {
+	const parameters = {
+		type: "object",
+		properties: {
+			path: {
+				type: "string",
+				description: "Use a workspace-relative path from the customized read tool.",
+			},
+		},
+	};
+	const promptGuidelines = ["Use customized read guidance before selecting a file."];
+	const { api, registeredTools } = createExtensionApiStub([
+		{
+			name: "read",
+			description: "Customized runtime read description.",
+			parameters,
+			promptSnippet: "Customized runtime read snippet",
+			promptGuidelines,
+			sourceInfo: { source: "builtin", path: "<builtin:read>" },
+		},
+	]);
+
+	registerToolDisplayOverrides(api, () => DEFAULT_TOOL_DISPLAY_CONFIG);
+
+	const readTool = registeredTools.find((tool) => tool.name === "read");
+	assert.ok(readTool);
+	assert.equal(readTool.description, "Customized runtime read description.");
+	assert.equal(readTool.promptSnippet, "Customized runtime read snippet");
+	assert.deepEqual(readTool.promptGuidelines, promptGuidelines);
+	assert.notEqual(readTool.promptGuidelines, promptGuidelines);
+	assert.deepEqual(readTool.parameters, parameters);
+	assert.notEqual(readTool.parameters, parameters);
+	assert.notEqual(
+		(readTool.parameters as typeof parameters).properties.path,
+		parameters.properties.path,
+	);
+});
+
+test("registerToolDisplayOverrides waits for runtime ownership metadata before registering built-ins", async () => {
+	const { api, registeredTools, eventHandlers, bindRuntime } = createExtensionApiStub([], {
+		initiallyBound: false,
+	});
+
+	registerToolDisplayOverrides(api, () => DEFAULT_TOOL_DISPLAY_CONFIG);
+	assert.equal(registeredTools.length, 0);
+
+	bindRuntime();
+	await eventHandlers.session_start?.();
+	assert.deepEqual(
+		registeredTools.map((tool) => tool.name).sort(),
+		["bash", "edit", "find", "grep", "ls", "read", "write"],
+	);
+});
+
+test("registerToolDisplayOverrides leaves a runtime-discovered external owner untouched", async () => {
+	const { api, registeredTools, eventHandlers, bindRuntime } = createExtensionApiStub(
+		[
+			{
+				name: "read",
+				description: "Externally owned read tool.",
+				parameters: {},
+				sourceInfo: { source: "local", path: "agent/extensions/example-read/index.ts" },
+			},
+		],
+		{ initiallyBound: false },
+	);
+
+	registerToolDisplayOverrides(api, () => DEFAULT_TOOL_DISPLAY_CONFIG);
+	bindRuntime();
+	await eventHandlers.session_start?.();
+
+	assert.equal(registeredTools.some((tool) => tool.name === "read"), false);
+});
+
+test("registerToolDisplayOverrides registers built-in display renderers during extension load when ownership metadata is available", () => {
 	const { api, registeredTools } = createExtensionApiStub();
 
 	registerToolDisplayOverrides(api, () => DEFAULT_TOOL_DISPLAY_CONFIG);

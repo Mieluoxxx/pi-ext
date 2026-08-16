@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added automatic `apply_patch` rendering that reuses adaptive edit diffs for structured single-file and multi-file previews, including progress and failure states.
 
+### Fixed
+- Deferred built-in display overrides until Pi exposes runtime ownership metadata, preserving customized tool descriptions, parameter schemas, prompt guidelines, and host-exposed prompt snippets while leaving externally owned tools untouched.
+
 ## [0.5.1] - 2026-08-16
 
 ### Added

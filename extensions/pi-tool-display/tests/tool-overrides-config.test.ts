@@ -57,13 +57,13 @@ function buildConfig(overrides: Partial<ToolDisplayConfig>): ToolDisplayConfig {
 	};
 }
 
-function withDefaultReadEditOwners(tools: unknown[] = []): unknown[] {
+function withDefaultBuiltInOwners(tools: unknown[] = []): unknown[] {
 	const names = new Set(
 		tools
 			.map((tool) => (tool as { name?: unknown }).name)
 			.filter((name): name is string => typeof name === "string"),
 	);
-	const defaults = ["read", "edit"]
+	const defaults = ["read", "grep", "find", "ls", "bash", "edit", "write"]
 		.filter((name) => !names.has(name))
 		.map((name) => ({ name, sourceInfo: { source: "builtin", path: `<builtin:${name}>` } }));
 	return [...defaults, ...tools];
@@ -85,7 +85,7 @@ function createExtensionApiStub(allTools: Array<RegisteredToolLike & Record<stri
 			eventHandlers[event] = handler;
 		},
 		getAllTools(): unknown[] {
-			return withDefaultReadEditOwners(allTools);
+			return withDefaultBuiltInOwners(allTools);
 		},
 	} as unknown as ExtensionAPI;
 
