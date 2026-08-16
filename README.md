@@ -91,7 +91,6 @@ pi -e ./extensions/pi-tool-display
 
 ```text
 extensions/   Independently published production Pi extensions
-docs/         Repository designs and decisions
 ```
 
 Each extension owns its package metadata, documentation, tests, and an explicit Pi entrypoint. Most use a thin `src/index.ts`; `pi-interactive-shell` keeps its upstream-compatible flat module layout.
