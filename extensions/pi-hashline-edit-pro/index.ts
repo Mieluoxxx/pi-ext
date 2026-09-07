@@ -11,6 +11,7 @@ import { extractWarnings } from "./src/replace-render";
 import { MAX_HASH_LINES } from "./src/hashline";
 import {
   readConfig,
+  readConfigSync,
   toggleAutoRead,
 } from "./src/config";
 import { loadHashStore, pruneMissing } from "./src/hash-store";
@@ -22,8 +23,8 @@ import { toCwd } from "./src/paths";
 import { resolveTarget } from "./src/fs-write";
 import { valAccess } from "./src/validation";
 
-export default async function (pi: ExtensionAPI): Promise<void> {
-  const config = await readConfig();
+export default function (pi: ExtensionAPI): void {
+  const config = readConfigSync();
   const disabled = new Set(config.disabledTools ?? []);
 
   regRead(pi);

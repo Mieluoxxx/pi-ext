@@ -33,7 +33,7 @@ pnpm install
 pi install ./extensions/pi-web-access
 ```
 
-After publishing the scoped package, it can also be installed with `pi install npm:@moguw/pi-web-access`. Run `pnpm --filter @moguw/pi-web-access run typecheck` and `pnpm --filter @moguw/pi-web-access test` from the repository root to validate changes.
+Install from npm with `pi install npm:@moguw/pi-web-access`. Run `pnpm --filter @moguw/pi-web-access run typecheck` and `pnpm --filter @moguw/pi-web-access test` from the repository root to validate changes.
 
 Works immediately with no API keys — Exa MCP provides zero-config search. If Pi has Codex auth from `/login`, OpenAI search can also work without a separate key. For more providers or direct API access, add keys to `~/.pi/web-search.json`:
 

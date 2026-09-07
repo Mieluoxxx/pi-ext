@@ -4,6 +4,7 @@ import { join } from "path";
 import {
   toggleAutoRead,
   readConfig,
+  readConfigSync,
   writeConfig,
 } from "../../src/config";
 import { getWritableTempRoot } from "../support/fixtures";
@@ -94,6 +95,43 @@ describe("config - readConfig defaults", () => {
     await withTempHome(async () => {
       await writeConfig({ autoRead: false });
       expect((await readConfig()).autoRead).toBe(false);
+    });
+  });
+});
+
+describe("config - readConfigSync", () => {
+  it("defaults like readConfig when no config file exists", async () => {
+    await withTempHome(async () => {
+      const config = readConfigSync();
+      expect(config.autoRead).toBe(true);
+      expect(config.disabledTools).toBeUndefined();
+    });
+  });
+
+  it("reads disabledTools for registration decisions", async () => {
+    await withTempHome(async () => {
+      const { writeFile, mkdir } = await import("fs/promises");
+      const { join: pathJoin } = await import("path");
+      const configDir = pathJoin(tmpHome, ".config", "pi-hashline-edit-pro");
+      await mkdir(configDir, { recursive: true });
+      await writeFile(
+        pathJoin(configDir, "config.json"),
+        JSON.stringify({ autoRead: true, disabledTools: ["grep"] }),
+      );
+      const config = readConfigSync();
+      expect(config.disabledTools).toEqual(["grep"]);
+      expect(config.autoRead).toBe(true);
+    });
+  });
+
+  it("falls back to defaults on malformed config", async () => {
+    await withTempHome(async () => {
+      const { writeFile, mkdir } = await import("fs/promises");
+      const { join: pathJoin } = await import("path");
+      const configDir = pathJoin(tmpHome, ".config", "pi-hashline-edit-pro");
+      await mkdir(configDir, { recursive: true });
+      await writeFile(pathJoin(configDir, "config.json"), "not json");
+      expect(readConfigSync().autoRead).toBe(true);
     });
   });
 });

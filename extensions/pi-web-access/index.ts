@@ -681,7 +681,7 @@ function resolveStoredContent(data: StoredSearchData, responseId: string, conten
 	if (data.type === "search" && data.queries) {
 		if (contentIndex === undefined && data.queries.length > 1) {
 			return {
-				error: "Multiple stored queries require contentIndex.",
+				error: `Multiple stored queries require contentIndex. Available content indexes:\n${data.queries.map((query, index) => `[${index}] "${query.query}"`).join("\n")}`,
 				details: { error: "Content index required", available: data.queries.map((query, index) => ({ contentIndex: index, query: query.query })) },
 			};
 		}
@@ -704,7 +704,7 @@ function resolveStoredContent(data: StoredSearchData, responseId: string, conten
 	if (data.type === "fetch" && data.urls) {
 		if (contentIndex === undefined && data.urls.length > 1) {
 			return {
-				error: "Multiple stored URLs require contentIndex.",
+				error: `Multiple stored URLs require contentIndex. Available content indexes:\n${data.urls.map((url, index) => `[${index}] ${url.title || url.url}`).join("\n")}`,
 				details: { error: "Content index required", available: data.urls.map((url, index) => ({ contentIndex: index, title: url.title, url: url.url })) },
 			};
 		}
@@ -2821,7 +2821,7 @@ export default function (pi: ExtensionAPI) {
 				}
 				if (offset > resolved.source.length) {
 					return {
-						content: [{ type: "text", text: `Offset ${offset} is out of range. Received offset ${offset}; valid range is 0-${resolved.source.length}. Use an offset within that range.` }],
+						content: [{ type: "text", text: `Offset ${offset} is out of range for responseId ${formatInputValue(params.responseId)}. Received offset ${offset}; valid range is 0-${resolved.source.length}. Use an offset within that range.` }],
 						details: { error: "Offset out of range", offset, contentLength: resolved.source.length },
 					};
 				}

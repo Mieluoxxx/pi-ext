@@ -2,8 +2,10 @@
 
 [![npm scope](https://img.shields.io/badge/npm-@moguw-blue)](https://www.npmjs.com/org/moguw)
 
-一组可独立安装的 [Pi Coding Agent](https://pi.dev) 扩展，以 npm workspace 方式管理。
+一组可独立安装的 [Pi Coding Agent](https://pi.dev) 扩展，以 pnpm workspace 方式管理。
 每个包都以 `@moguw` scope 独立发布到 npm —— 按需安装即可。
+
+`extensions/` 下的扩展都是本仓库直接跟踪的源码目录，共用根目录的 `.git`，不使用嵌套 Git 仓库或 submodule。
 
 ## 🧩 模块介绍
 

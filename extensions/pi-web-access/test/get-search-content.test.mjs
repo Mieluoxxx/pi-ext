@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { beforeEach, test } from "node:test";
 import { Value } from "typebox/value";
 
 import initializeExtension from "../index.ts";
 import { buildResearchArtifact, storeResearchArtifact } from "../source-check.ts";
 import { clearResults, storeResult } from "../storage.ts";
 
+beforeEach(() => clearResults());
+
 function getContentTool() {
-	clearResults();
 	const tools = [];
 	initializeExtension({
 		registerTool(tool) { tools.push(tool); },
@@ -21,7 +22,6 @@ function getContentTool() {
 }
 
 function findContentTool() {
-	clearResults();
 	const tools = [];
 	initializeExtension({
 		registerTool(tool) { tools.push(tool); },
@@ -135,6 +135,28 @@ test("multiple stored URLs require contentIndex and list the mapping", async () 
 	const selected = await tool.execute("call", { responseId: "large-fetch", contentIndex: 1 });
 	assert.equal(selected.details.contentIndex, 1);
 	assert.match(selected.content[0].text, /second/);
+});
+
+test("multiple stored queries require contentIndex and list the mapping", async () => {
+	const tool = getContentTool();
+	storeResult("search-result", {
+		id: "search-result",
+		type: "search",
+		timestamp: Date.now(),
+		queries: [
+			{ query: "first query", answer: "", results: [{ title: "Alpha", url: "https://example.com/alpha", snippet: "first result" }], error: null },
+			{ query: "second query", answer: "", results: [{ title: "Beta", url: "https://example.com/beta", snippet: "second result" }], error: null },
+		],
+	});
+
+	const missing = await tool.execute("call", { responseId: "search-result" });
+	assert.equal(missing.details.error, "Content index required");
+	assert.match(missing.content[0].text, /\[0\] "first query"/);
+	assert.match(missing.content[0].text, /\[1\] "second query"/);
+
+	const selected = await tool.execute("call", { responseId: "search-result", contentIndex: 1 });
+	assert.equal(selected.details.contentIndex, 1);
+	assert.match(selected.content[0].text, /Beta/);
 });
 
 test("get_search_content returns a bounded first slice for large fetched content", async () => {

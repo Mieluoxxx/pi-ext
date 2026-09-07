@@ -1,4 +1,5 @@
 import { readFile } from "fs/promises";
+import { readFileSync } from "fs";
 import { configPath } from "./paths";
 import { errCode, isRec } from "./utils";
 import { writeAtomic } from "./fs-write";
@@ -36,6 +37,18 @@ export async function readConfig(): Promise<Config> {
     return { ...DEFAULT_CONFIG };
   }
 }
+
+export function readConfigSync(): Config {
+  try {
+    return parseConfig(readFileSync(configPath(), "utf-8"));
+  } catch (error: unknown) {
+    if (errCode(error) !== "ENOENT") {
+      console.error("Config file corrupted, using defaults:", error);
+    }
+    return { ...DEFAULT_CONFIG };
+  }
+}
+
 export async function writeConfig(config: Config): Promise<void> {
   await writeAtomic(configPath(), JSON.stringify(config, null, 2));
 }

@@ -44,14 +44,14 @@ kQm│}
 
 ## Installation
 
-The scoped npm release is pending validation. From the `pi-ext` repository root:
+From the `pi-ext` repository root:
 
 ```bash
 pnpm install
 pi install ./extensions/pi-hashline-edit-pro
 ```
 
-After publishing the scoped package:
+Install from npm:
 
 ```bash
 pi install npm:@moguw/pi-hashline-edit-pro

@@ -9,12 +9,14 @@ import { withTempFile, withTempDir, makeFakePiRegistry, setupIntegrationTest, ge
 import register from "../../index";
 
 describe("grep tool", () => {
-  it("registers a tool named grep", () => {
-    const { pi, getTool } = makeFakePiRegistry();
-    register(pi);
-    const tool = getTool("grep");
-    expect(tool).toBeDefined();
-    expect(tool.name).toBe("grep");
+  it("registers a tool named grep", async () => {
+    await withTempDir("grep-register-", async () => {
+      const { pi, getTool } = makeFakePiRegistry();
+      register(pi);
+      const tool = getTool("grep");
+      expect(tool).toBeDefined();
+      expect(tool.name).toBe("grep");
+    });
   });
 
   it("returns matching lines with the same anchors as read", async () => {
