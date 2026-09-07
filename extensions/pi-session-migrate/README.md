@@ -113,9 +113,9 @@ Notes:
 ## 🔧 Development
 
 ```bash
-npm install
-npm run typecheck
-npm test
+pnpm install
+pnpm run typecheck
+pnpm test
 ```
 
 ## 🗂️ Package layout

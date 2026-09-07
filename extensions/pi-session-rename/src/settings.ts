@@ -93,6 +93,7 @@ export async function showSettings(ctx: ExtensionCommandContext): Promise<void> 
 			`model: ${config.model || "(current session model)"}`,
 			`thinkingLevel: ${config.thinkingLevel}`,
 			`afterSteps: ${config.afterSteps}`,
+			`everySteps: ${config.everySteps}`,
 			"Done",
 		]);
 
@@ -129,7 +130,7 @@ export async function showSettings(ctx: ExtensionCommandContext): Promise<void> 
 			ctx.ui.notify(`Thinking level set to ${level}`, "info");
 		} else if (choice.startsWith("afterSteps:")) {
 			const value = await ctx.ui.input(
-				"Auto-rename after user-agent turns (0 disables)",
+				"First auto-rename after user-agent turns (0 disables)",
 				String(config.afterSteps),
 			);
 			const parsed = parseNonNegativeInt(value);
@@ -138,7 +139,19 @@ export async function showSettings(ctx: ExtensionCommandContext): Promise<void> 
 				continue;
 			}
 			saveConfig({ afterSteps: parsed });
-			ctx.ui.notify(`Auto-rename after ${parsed} user-agent turns`, "info");
+			ctx.ui.notify(`First auto-rename after ${parsed} user-agent turns`, "info");
+		} else if (choice.startsWith("everySteps:")) {
+			const value = await ctx.ui.input(
+				"Update the name every N user-agent turns (0 names once)",
+				String(config.everySteps),
+			);
+			const parsed = parseNonNegativeInt(value);
+			if (parsed === null) {
+				ctx.ui.notify("everySteps must be a non-negative integer", "warning");
+				continue;
+			}
+			saveConfig({ everySteps: parsed });
+			ctx.ui.notify(`Auto-rename every ${parsed} user-agent turns`, "info");
 		}
 	}
 }

@@ -4,13 +4,10 @@
 	"private": true,
 	"description": "Monorepo for @moguw Pi extension packages",
 	"type": "module",
-	"workspaces": [
-		"extensions/*"
-	],
 	"scripts": {
-		"check": "npm run typecheck && npm test",
-		"typecheck": "npm --workspaces --if-present run typecheck",
-		"test": "npm --workspaces --if-present run test",
-		"pack:session-rename": "npm pack --workspace @moguw/pi-session-rename --dry-run"
+		"check": "pnpm run typecheck && pnpm run test",
+		"typecheck": "pnpm -r run typecheck",
+		"test": "pnpm -r run test",
+		"pack:session-rename": "pnpm --filter @moguw/pi-session-rename pack --dry-run"
 	}
 }

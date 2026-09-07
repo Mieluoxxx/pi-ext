@@ -1,0 +1,1 @@
+Read a text file; each line returned as `anchor│content` with a 3-character alphanumeric anchor. No line numbers: use the anchor in replace and insert calls. Images → visual attachments; Binary/directory → rejected; UTF-16/UTF-32 (BOM) → rejected; empty → anchor│ (replace to insert); pageable with offset/limit; BOM stripped; non-UTF-8 shown as U+FFFD.

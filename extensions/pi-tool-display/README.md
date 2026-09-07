@@ -417,13 +417,13 @@ extensions/pi-tool-display/
 
 ```bash
 # Type check
-npm run build
+pnpm run build
 
 # Run tests
-npm run test
+pnpm run test
 
 # Full verification
-npm run check
+pnpm run check
 ```
 
 ## Related Pi Extensions

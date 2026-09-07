@@ -10,17 +10,54 @@ import {
 	summarizeNamingResponse,
 } from "../src/debug.js";
 import {
+	buildConversationText,
 	buildNamingOptions,
 	extractSessionName,
 	getRenameArgumentCompletions,
+	isNamingDue,
 	parseModelRef,
 	parseRenameCommand,
 	resolveThinkingLevel,
 	sanitizeName,
+	sessionDateStamp,
 	shouldApplyAutoName,
 	stripQuotes,
 } from "../src/rename.js";
 import { MODEL_SELECTOR_MAX_VISIBLE, showSettings } from "../src/settings.js";
+
+describe("buildConversationText", () => {
+	it("keeps user messages and drops assistant and tool-call content", () => {
+		const branch = [
+			{
+				type: "message",
+				message: { role: "user", content: [{ type: "text", text: "Fix the auth bug" }] },
+			},
+			{
+				type: "message",
+				message: {
+					role: "assistant",
+					content: [
+						{ type: "text", text: "Working on it" },
+						{ type: "toolCall", name: "write", arguments: { content: "huge file body" } },
+					],
+				},
+			},
+		] as any;
+		expect(buildConversationText(branch)).toBe("User: Fix the auth bug");
+	});
+});
+
+describe("sessionDateStamp", () => {
+	it("formats the first entry timestamp as MMDD in Asia/Shanghai", () => {
+		const branch = [{ type: "message", timestamp: "2026-09-03T18:00:00Z" }] as any;
+		// 18:00 UTC is already the next day in Shanghai.
+		expect(sessionDateStamp(branch)).toBe("0904");
+	});
+
+	it("falls back to now for an empty branch", () => {
+		expect(sessionDateStamp([])).toMatch(/^\d{4}$/);
+	});
+});
 
 describe("parseRenameCommand", () => {
 	it("parses bare /rename as generate", () => {
@@ -100,6 +137,7 @@ describe("showSettings", () => {
 		expect(menu.some((item) => item.startsWith("model:"))).toBe(true);
 		expect(menu.some((item) => item.startsWith("thinkingLevel:"))).toBe(true);
 		expect(menu.some((item) => item.startsWith("afterSteps:"))).toBe(true);
+		expect(menu.some((item) => item.startsWith("everySteps:"))).toBe(true);
 		expect(menu).toContain("Done");
 		expect(menu.some((item) => item.startsWith("prompt:"))).toBe(false);
 	});
@@ -176,9 +214,9 @@ describe("sanitizeName", () => {
 		expect(sanitizeName("Fix login test\nHere is the reasoning")).toBe("Fix login test");
 	});
 
-	it("truncates to 80 characters", () => {
-		const long = "x".repeat(100);
-		expect(sanitizeName(long)?.length).toBe(80);
+	it("truncates to 120 characters", () => {
+		const long = "x".repeat(150);
+		expect(sanitizeName(long)?.length).toBe(120);
 	});
 
 	it("returns undefined for empty input", () => {
@@ -216,11 +254,11 @@ describe("extractSessionName", () => {
 		).toBe("Fix auth middleware tests");
 	});
 
-	it("limits generated names to fewer than 20 words", () => {
-		const words = Array.from({ length: 24 }, (_, index) => `w${index + 1}`);
+	it("limits generated names to fewer than 30 words", () => {
+		const words = Array.from({ length: 35 }, (_, index) => `w${index + 1}`);
 		const name = extractSessionName(`<session_name>${words.join(" ")}</session_name>`);
-		expect(name?.split(/\s+/)).toHaveLength(19);
-		expect(name).toBe(words.slice(0, 19).join(" "));
+		expect(name?.split(/\s+/)).toHaveLength(29);
+		expect(name).toBe(words.slice(0, 29).join(" "));
 	});
 });
 
@@ -343,17 +381,46 @@ describe("parseModelRef", () => {
 	});
 });
 
+describe("isNamingDue", () => {
+	it("fires on the first turn then every 5 turns (defaults)", () => {
+		expect(isNamingDue(1, 1, 5)).toBe(true);
+		expect(isNamingDue(2, 1, 5)).toBe(false);
+		expect(isNamingDue(5, 1, 5)).toBe(false);
+		expect(isNamingDue(6, 1, 5)).toBe(true);
+		expect(isNamingDue(11, 1, 5)).toBe(true);
+	});
+
+	it("names only once when everySteps is 0", () => {
+		expect(isNamingDue(1, 1, 0)).toBe(true);
+		expect(isNamingDue(6, 1, 0)).toBe(false);
+	});
+
+	it("never fires when afterSteps is 0", () => {
+		expect(isNamingDue(1, 0, 5)).toBe(false);
+		expect(isNamingDue(10, 0, 5)).toBe(false);
+	});
+
+	it("waits until afterSteps is reached", () => {
+		expect(isNamingDue(2, 3, 5)).toBe(false);
+		expect(isNamingDue(3, 3, 5)).toBe(true);
+	});
+});
+
 describe("shouldApplyAutoName", () => {
 	it("applies when the session epoch is unchanged and the name is still unset", () => {
-		expect(shouldApplyAutoName(1, 1, undefined)).toBe(true);
+		expect(shouldApplyAutoName(1, 1, undefined, false)).toBe(true);
 	});
 
 	it("skips when the session was replaced during generation", () => {
-		expect(shouldApplyAutoName(1, 2, undefined)).toBe(false);
+		expect(shouldApplyAutoName(1, 2, undefined, false)).toBe(false);
 	});
 
 	it("skips when a name was set while generation was pending", () => {
-		expect(shouldApplyAutoName(1, 1, "Manually set")).toBe(false);
+		expect(shouldApplyAutoName(1, 1, "Manually set", false)).toBe(false);
+	});
+
+	it("replaces a previous auto-generated name on refresh", () => {
+		expect(shouldApplyAutoName(1, 1, "0901｜EXP｜Old title", true)).toBe(true);
 	});
 });
 

@@ -3,12 +3,15 @@
 [![npm](https://img.shields.io/npm/v/@moguw/pi-session-rename)](https://www.npmjs.com/package/@moguw/pi-session-rename) [![Pi extension](https://img.shields.io/badge/Pi-extension-blue)](https://pi.dev) [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 
 `@moguw/pi-session-rename` is a native [Pi coding agent](https://pi.dev) extension that automatically
-names Pi sessions from conversation context. An unnamed session gets a concise, specific title after a
-configurable amount of conversation, and `/rename` gives you full manual control.
+names Pi sessions from conversation context. The session gets a structured `MMDD｜TYPE｜Topic` title
+after the first turn and the name is refreshed periodically as the conversation evolves, while
+`/rename` gives you full manual control.
 
 ## ✨ Features
 
-- Auto-renames an unnamed session after a configurable number of user-agent turns.
+- Auto-names the session after a configurable number of user-agent turns (default: the first turn).
+- Refreshes the name periodically as the conversation evolves (default: every 5 turns).
+- Titles follow `MMDD｜TYPE｜Topic` — session start date, a type code, and a short topic.
 - `/rename` generates a name from the conversation with the configured naming model.
 - `/rename "<name>"` sets a session name directly, overriding any automatic naming.
 - Automatic naming never overwrites a manually set name.
@@ -47,7 +50,7 @@ provides `/rename` for manual control.
 For example:
 
 ```text
-/rename                              -> "Refactor auth middleware"
+/rename                              -> "0903｜FEA｜Auth middleware refactor"
 /rename "Billing schema migration"   -> sets the name directly
 ```
 
@@ -57,7 +60,8 @@ For example:
 
 ```json
 {
-  "afterSteps": 3,
+  "afterSteps": 1,
+  "everySteps": 5,
   "model": "",
   "thinkingLevel": "minimal"
 }
@@ -65,7 +69,9 @@ For example:
 
 Fields:
 
-- `afterSteps`: user-agent turns before auto-renaming an unnamed session. `0` disables this trigger.
+- `afterSteps`: user-agent turns before the first auto-rename. `0` disables auto-renaming.
+- `everySteps`: re-run auto-rename every N user-agent turns after the first. `0` names once and
+  never refreshes.
 - `model`: naming model as `provider/model`. Empty uses the current session model.
 - `thinkingLevel`: thinking level for the naming request. One of `off`, `minimal`, `low`, `medium`,
   `high`, `xhigh`, `max`. `off` omits the reasoning option.
@@ -75,12 +81,19 @@ The previous `~/.pi/agent/pi-session.json` path is not read or migrated.
 ## 🧠 Behavior
 
 - Naming uses the configured model, or the current session model when `model` is empty, through `pi-ai`.
+- Auto-rename fires on the `afterSteps`-th user-agent turn (default: the first), then again every
+  `everySteps` turns (default: 5) so the title tracks how the conversation evolves.
+- Titles follow `MMDD｜TYPE｜Topic`: the session start date in Asia/Shanghai, a type code — one of
+  `FEA` (feature), `DES` (design), `FIX` (bug fix), `OPT` (optimization), `REL` (release), `EXP`
+  (exploration), `DOC` (docs), `RES` (research) — and a short topic in the user's language.
 - Naming instructions and the tagged output contract are built in and are not user-configurable.
 - The request reuses the session transport, websocket connect timeout, session id, and configured naming thinking level.
 - Naming requests have a 60-second timeout and do not set an output-token limit.
-- The model must return `<session_name>...</session_name>` with fewer than 20 words.
+- The model must return `<session_name>...</session_name>` with fewer than 30 words; names are
+  truncated to 120 characters.
 - Only text response blocks are parsed; thinking blocks are ignored.
-- Automatic naming only sets a name when the session has none and never overwrites a manually set name.
+- Automatic naming never overwrites a manually set name (`/rename "<name>"`); it only refreshes
+  names it generated itself.
 - Manual renames (`/rename` and `/rename "<name>"`) rename the current Herdr tab unconditionally.
 - Automatic renames and session startup/resume only rename Herdr tabs that still have their default label (empty or the tab number), never a custom Herdr label.
 - Herdr sync is best-effort: when Herdr is unavailable or a command fails, session renaming still succeeds.
@@ -88,9 +101,9 @@ The previous `~/.pi/agent/pi-session.json` path is not read or migrated.
 ## 🔧 Development
 
 ```bash
-npm install
-npm run typecheck
-npm test
+pnpm install
+pnpm run typecheck
+pnpm test
 ```
 
 Enable temporary naming diagnostics before starting Pi:

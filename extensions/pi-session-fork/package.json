@@ -1,6 +1,6 @@
 {
 	"name": "@moguw/pi-session-fork",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "Fork Pi sessions into Herdr panes or tabs, and run inline/outline side conversations",
 	"type": "module",
 	"license": "MIT",
@@ -31,7 +31,7 @@
 		"LICENSE"
 	],
 	"scripts": {
-		"check": "npm run typecheck && npm test",
+		"check": "pnpm run typecheck && pnpm run test",
 		"typecheck": "tsc --noEmit",
 		"test": "vitest run"
 	},

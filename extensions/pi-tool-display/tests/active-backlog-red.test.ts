@@ -58,10 +58,9 @@ test("issue #23: expanded large diffs stay bounded for small tmux panes", () => 
 });
 
 test("PR #24: lockfile uses patched esbuild 0.28.1 or newer", () => {
-	const lockfile = JSON.parse(readFileSync(new URL("../../../package-lock.json", import.meta.url), "utf8")) as {
-		packages?: Record<string, { version?: string }>;
-	};
-	const version = lockfile.packages?.["node_modules/esbuild"]?.version;
+	const lockfile = readFileSync(new URL("../../../pnpm-lock.yaml", import.meta.url), "utf8");
+	const match = lockfile.match(/^  esbuild@(\d+\.\d+\.\d+):$/m);
+	const version = match?.[1];
 	assert.ok(version, "expected esbuild in the workspace lockfile");
 	const [major = 0, minor = 0, patch = 0] = version.split(".").map(Number);
 	assert.ok(

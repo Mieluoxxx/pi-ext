@@ -1,6 +1,6 @@
 {
 	"name": "@moguw/pi-session-migrate",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"description": "Migrate a project's Pi sessions after the project moves to a new path",
 	"type": "module",
 	"license": "MIT",
@@ -28,7 +28,7 @@
 		"LICENSE"
 	],
 	"scripts": {
-		"check": "npm run typecheck && npm test",
+		"check": "pnpm run typecheck && pnpm run test",
 		"typecheck": "tsc --noEmit",
 		"test": "vitest run"
 	},

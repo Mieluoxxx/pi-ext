@@ -1,101 +1,50 @@
-# 🧩 Pi Extensions for the Pi Coding Agent
+# 🧩 Pi 扩展集（Pi Coding Agent Extensions）
 
 [![npm scope](https://img.shields.io/badge/npm-@moguw-blue)](https://www.npmjs.com/org/moguw)
 
-Independently installable [Pi Coding Agent](https://pi.dev) extensions, managed as an npm workspace.
-Every package is published separately under the `@moguw` npm scope — install only what you need.
+一组可独立安装的 [Pi Coding Agent](https://pi.dev) 扩展，以 npm workspace 方式管理。
+每个包都以 `@moguw` scope 独立发布到 npm —— 按需安装即可。
 
-## 🚀 Quick start
+## 🧩 模块介绍
 
-Install an extension permanently:
-
-```bash
-pi install npm:@moguw/pi-session-rename
-```
-
-Try one without adding it permanently:
-
-```bash
-pi -e npm:@moguw/pi-session-migrate
-```
-
-> [!IMPORTANT]
-> Pi extensions run with your full user permissions. Review an extension before installing it from any third party.
-
-## 📦 Choose an extension
-
-### Session management
-
-| Package | Use it for | Install |
+| 名称 | 设计意图 | 源仓库地址 @ commit |
 | --- | --- | --- |
-| [`pi-session-rename`](./extensions/pi-session-rename) | Automatically name Pi sessions from conversation context, with a manual `/rename` command. | `pi install npm:@moguw/pi-session-rename` |
-| [`pi-session-migrate`](./extensions/pi-session-migrate) | Migrate a project's Pi sessions after the project moves to a new path, via `/migrate`. | `pi install npm:@moguw/pi-session-migrate` |
-| [`pi-session-fork`](./extensions/pi-session-fork) | Fork the session into a Herdr pane/tab, and ask inline (in-context) or outline (out-of-context) side questions, via `/btw`. | `pi install npm:@moguw/pi-session-fork` |
+| `pi-session-rename` | 为未命名会话自动生成上下文名称；Herdr tab 同步 | - |
+| `pi-session-migrate` | 项目移动后以“拷贝 + 引用改写”找回悬空会话 | - |
+| `pi-session-fork` | `/btw` inline 进入上下文、`/btw` outline 用只读快照直调模型不打扰会话；`/btw` 能够 fork 会话并实现 Herdr 分屏 | - |
+| `pi-interactive-shell` | 改进原本的命令，提升 Agent 工具调用正确率 | [nicobailon/pi-interactive-shell](https://github.com/nicobailon/pi-interactive-shell) @ `87938ca`（v0.15.0） |
+| `pi-tool-display` | 增加对 MCP 工具、Apply Patch 工具的渲染 | [MasuRii/pi-tool-display](https://github.com/MasuRii/pi-tool-display) @ `91cef75`（v0.5.0） |
+| `pi-hashline-edit-pro` | 增加 `disabledTools` 配置，可禁用与其它扩展冲突的工具 | [YuGiMob/pi-hashline-edit-pro](https://github.com/YuGiMob/pi-hashline-edit-pro) @ `77d545e`（v2.7.2，本地 patch 分支 `local/disabled-tools`） |
+| `pi-web-access` | Web 搜索、网页提取与视频理解；保留本地工具注册及内容检索修改 | [nicobailon/pi-web-access](https://github.com/nicobailon/pi-web-access) @ `597be04`（v0.24.2） |
 
-### Agent tooling
+## 🧑‍💻 本地开发
 
-| Package | Use it for | Install |
-| --- | --- | --- |
-| [`pi-interactive-shell`](./extensions/pi-interactive-shell) | Run interactive CLIs in observable Pi overlays with interactive, hands-free, dispatch, and monitor modes. | `pi install npm:@moguw/pi-interactive-shell` |
-| [`pi-tool-display`](./extensions/pi-tool-display) | Keep tool calls compact, render richer diffs, and control noisy tool output in the Pi TUI. | `pi install npm:@moguw/pi-tool-display` |
-
-## 🔧 Advanced installation
-
-Install this repository directly from GitHub as one Pi package:
+在仓库根目录执行：
 
 ```bash
-pi install git:github.com/Mieluoxxx/pi-ext
+pnpm install
+pnpm run check
 ```
 
-The repository root auto-discovers every production extension under `extensions/`, so this enables all of them.
-
-To load only selected extensions, replace the installed package entry in `~/.pi/agent/settings.json` with a resource filter:
-
-```json
-{
-  "packages": [
-    {
-      "source": "git:github.com/Mieluoxxx/pi-ext",
-      "extensions": [
-        "extensions/pi-session-rename/src/index.ts",
-        "extensions/pi-session-migrate/src/index.ts",
-        "extensions/pi-interactive-shell/index.ts",
-        "extensions/pi-tool-display/index.ts"
-      ]
-    }
-  ]
-}
-```
-
-Filters use resource paths relative to the repository root. Restart Pi or run `/reload` after changing the filter.
-
-## 🧑‍💻 Local development
-
-From the repository root:
-
-```bash
-npm install
-npm run check
-```
-
-Try an extension from the repository root without installing it:
+无需安装、直接从仓库根目录试用某个扩展：
 
 ```bash
 pi -e ./extensions/pi-session-rename
 pi -e ./extensions/pi-session-migrate
 pi -e ./extensions/pi-interactive-shell
 pi -e ./extensions/pi-tool-display
+pi -e ./extensions/pi-web-access
 ```
 
-## 🗂️ Repository structure
+## 🗂️ 仓库结构
 
 ```text
-extensions/   Independently published production Pi extensions
+extensions/   独立发布的生产级 Pi 扩展
 ```
 
-Each extension owns its package metadata, documentation, tests, and an explicit Pi entrypoint. Most use a thin `src/index.ts`; `pi-interactive-shell` keeps its upstream-compatible flat module layout.
-The private repository root supplies workspace orchestration and is installable as one Git-backed Pi package.
+每个扩展自带包元数据、文档、测试以及显式的 Pi 入口。大多数扩展使用精简的 `src/index.ts`；`pi-interactive-shell` 保持了与其上游一致的扁平模块布局。
+私有仓库根目录负责 workspace 编排，同时也可作为一个基于 Git 的 Pi 包安装。
 
-## 📄 License
+## 📄 许可证
 
-Each extension declares its own license in its package directory.
+每个扩展在其包目录内声明各自的许可证。

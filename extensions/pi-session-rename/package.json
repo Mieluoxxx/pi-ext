@@ -1,6 +1,6 @@
 {
 	"name": "@moguw/pi-session-rename",
-	"version": "0.2.1",
+	"version": "0.2.2",
 	"description": "Automatically name Pi sessions from conversation context",
 	"type": "module",
 	"license": "MIT",
@@ -29,7 +29,7 @@
 		"LICENSE"
 	],
 	"scripts": {
-		"check": "npm run typecheck && npm test",
+		"check": "pnpm run typecheck && pnpm run test",
 		"typecheck": "tsc --noEmit",
 		"test": "vitest run"
 	},

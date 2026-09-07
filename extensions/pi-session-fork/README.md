@@ -63,8 +63,8 @@ Answers the question with a direct model call that never touches the session con
 ## Development
 
 ```bash
-npm install
-npm run check
+pnpm install
+pnpm run check
 ```
 
 ## License

@@ -101,7 +101,7 @@ Match output from a long-running command:
 
 ```typescript
 interactive_shell({
-  command: "npm test -- --watch",
+  command: "pnpm test -- --watch",
   mode: "monitor",
   monitor: {
     strategy: "stream",

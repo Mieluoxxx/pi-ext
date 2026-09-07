@@ -15,8 +15,10 @@ export const THINKING_LEVELS = [
 export type ThinkingLevelValue = (typeof THINKING_LEVELS)[number];
 
 export type RenameConfig = {
-	/** User-agent turns before auto-renaming an unnamed session. 0 disables. */
+	/** User-agent turns before the first auto-rename. 0 disables auto-renaming. */
 	afterSteps: number;
+	/** Re-run auto-rename every N user-agent turns after the first. 0 names once. */
+	everySteps: number;
 	/** Naming model as `provider/model`. Empty uses the current session model. */
 	model: string;
 	/** Thinking level for the naming request. "off" disables reasoning. */
@@ -24,7 +26,8 @@ export type RenameConfig = {
 };
 
 export const DEFAULT_CONFIG: RenameConfig = {
-	afterSteps: 3,
+	afterSteps: 1,
+	everySteps: 5,
 	model: "",
 	thinkingLevel: "minimal",
 };
@@ -49,6 +52,15 @@ export function loadConfig(
 				value.afterSteps = Math.floor(afterSteps);
 			} else {
 				warnings.push(`Ignored invalid afterSteps: ${JSON.stringify(afterSteps)}`);
+			}
+		}
+
+		const everySteps = parsed.everySteps;
+		if (everySteps !== undefined) {
+			if (typeof everySteps === "number" && Number.isFinite(everySteps) && everySteps >= 0) {
+				value.everySteps = Math.floor(everySteps);
+			} else {
+				warnings.push(`Ignored invalid everySteps: ${JSON.stringify(everySteps)}`);
 			}
 		}
 
