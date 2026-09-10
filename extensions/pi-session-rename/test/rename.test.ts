@@ -482,6 +482,7 @@ describe("config", () => {
 		const path = tempConfig();
 		const { value, warnings } = loadConfig(path);
 		expect(value).toEqual(DEFAULT_CONFIG);
+		expect(value.thinkingLevel).toBe("low");
 		expect(warnings).toEqual([]);
 	});
 

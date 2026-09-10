@@ -29,7 +29,7 @@ export const DEFAULT_CONFIG: RenameConfig = {
 	afterSteps: 1,
 	everySteps: 5,
 	model: "",
-	thinkingLevel: "minimal",
+	thinkingLevel: "low",
 };
 
 export function configPath(): string {

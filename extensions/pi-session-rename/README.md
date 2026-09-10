@@ -63,7 +63,7 @@ For example:
   "afterSteps": 1,
   "everySteps": 5,
   "model": "",
-  "thinkingLevel": "minimal"
+  "thinkingLevel": "low"
 }
 ```
 
@@ -73,7 +73,7 @@ Fields:
 - `everySteps`: re-run auto-rename every N user-agent turns after the first. `0` names once and
   never refreshes.
 - `model`: naming model as `provider/model`. Empty uses the current session model.
-- `thinkingLevel`: thinking level for the naming request. One of `off`, `minimal`, `low`, `medium`,
+- `thinkingLevel`: thinking level for the naming request (default: `low`). One of `off`, `minimal`, `low`, `medium`,
   `high`, `xhigh`, `max`. `off` omits the reasoning option.
 
 The previous `~/.pi/agent/pi-session.json` path is not read or migrated.

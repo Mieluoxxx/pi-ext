@@ -1,6 +1,6 @@
 {
 	"name": "@moguw/pi-session-rename",
-	"version": "0.2.2",
+	"version": "0.2.3",
 	"description": "Automatically name Pi sessions from conversation context",
 	"type": "module",
 	"license": "MIT",
