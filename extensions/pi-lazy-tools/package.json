@@ -1,0 +1,12 @@
+{
+  "name": "@moguw/pi-lazy-tools",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Skill-led activation of existing Pi tools without duplicating their implementations",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "test:reload": "node test/verify-reload.mjs"
+  },
+  "pi": { "extensions": ["./index.ts"], "skills": ["./skills"] }
+}
