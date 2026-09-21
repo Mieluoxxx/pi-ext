@@ -99,6 +99,13 @@ interactive_shell({ dismissBackground: "calm-reef" })
 
 Match output from a long-running command:
 
+Each trigger must supply exactly one non-empty `literal` or `regex`; omit the
+other field entirely. An empty string (`""`) still counts as supplied.
+Omit `threshold` unless comparing a numeric regex capture (`captureGroup >= 1`).
+Start from a minimal example instead of filling unused optional fields with
+placeholders. A validation error means no monitor process was started: correct
+the parameters before retrying, never repeat the unchanged invalid call.
+
 ```typescript
 interactive_shell({
   command: "pnpm test -- --watch",

@@ -21,6 +21,9 @@ CHOOSE AT MOST ONE SESSION LIFECYCLE SELECTOR BEFORE CALLING: \`command\`, a non
 
 MONITOR CALLS:
 - Start a monitor with \`mode: "monitor"\` and a structured \`monitor\` object. A file-watch monitor may omit \`command\`.
+- Each trigger must supply exactly one non-empty \`literal\` or \`regex\`. Omit the other field entirely: an empty string still counts as supplied.
+- Omit \`threshold\` for ordinary log matching. It is only for numeric regex captures, with \`captureGroup >= 1\`.
+- Build from a minimal example; do not fill unused optional fields with empty strings, zeroes, or placeholder objects.
 - Query monitor state or events with \`monitorStatus\` or \`monitorEvents\` plus \`monitorSessionId\` or \`sessionId\`.
 
 MINIMAL EXISTING-SESSION CALLS:
@@ -295,11 +298,11 @@ export const toolParameters = Type.Object({
 			})),
 			triggers: Type.Array(Type.Object({
 				id: Type.String({ description: "Unique trigger id used in emitted event payloads." }),
-				literal: Type.Optional(Type.String({ description: "Literal substring trigger." })),
-				regex: Type.Optional(Type.String({ description: "Regex trigger string. Supports /pattern/flags format." })),
+				literal: Type.Optional(Type.String({ description: "Non-empty literal substring trigger. Mutually exclusive with regex: omit the regex field entirely, not an empty string. Do not supply threshold." })),
+				regex: Type.Optional(Type.String({ description: "Non-empty regex trigger string. Supports /pattern/flags format. Mutually exclusive with literal: omit the literal field entirely, not an empty string." })),
 				cooldownMs: Type.Optional(Type.Number({ description: "Optional per-trigger cooldown window in ms." })),
 				threshold: Type.Optional(Type.Object({
-					captureGroup: Type.Number({ description: "Regex capture group index parsed as number (requires regex matcher)." }),
+					captureGroup: Type.Number({ description: "Regex capture group index parsed as number: integer >= 1 (1 is the first (...) capture, not the whole match). Omit threshold unless comparing a numeric capture." }),
 					op: Type.Union([
 						Type.Literal("lt"),
 						Type.Literal("lte"),
@@ -307,9 +310,9 @@ export const toolParameters = Type.Object({
 						Type.Literal("gte"),
 					], { description: "Threshold operator." }),
 					value: Type.Number({ description: "Threshold numeric value." }),
-				})),
+				}, { description: "Optional numeric comparison for a regex capture. Omit this entire object for ordinary literal or regex log matching; do not send a placeholder." })),
 			}), {
-				description: "Named trigger definitions. Each trigger must define exactly one matcher: literal or regex.",
+				description: "Named trigger definitions. Each trigger must define exactly one non-empty matcher: literal or regex. Omit the unused field entirely; empty strings are still supplied fields.",
 			}),
 			fileWatch: Type.Optional(Type.Object({
 				path: Type.String({ description: "Path to watch for strategy='file-watch'. Relative paths resolve from cwd." }),

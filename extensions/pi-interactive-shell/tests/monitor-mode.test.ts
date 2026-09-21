@@ -204,6 +204,51 @@ describe("monitor mode", () => {
 		expect(typeof harness.getMonitorOptions()?.onMonitorEvent).toBe("function");
 	});
 
+	it.each([
+		{ name: "both matchers", trigger: { id: "ready", literal: "fixture-secret-literal", regex: "/fixture-secret-regex/" }, received: "Received both literal and regex string fields." },
+		{ name: "empty regex placeholder", trigger: { id: "ready", literal: "READY", regex: "" }, received: "Received both literal and regex string fields." },
+		{ name: "empty literal placeholder", trigger: { id: "ready", literal: "", regex: "/READY/" }, received: "Received both literal and regex string fields." },
+		{ name: "two empty placeholders", trigger: { id: "ready", literal: "", regex: "" }, received: "Received both literal and regex string fields." },
+		{ name: "missing matcher", trigger: { id: "ready" }, received: "Received neither literal nor regex as a string." },
+	])("explains how to repair $name without launching or echoing matcher values", async ({ trigger, received }) => {
+		const harness = await setupHarness();
+		const ctx = {
+			hasUI: false,
+			cwd: "/tmp/project",
+			ui: {},
+			sessionManager: { getSessionFile: () => "/tmp/project/session.jsonl" },
+		} as any;
+		const result = await harness.toolDef.execute("invalid", {
+			command: "echo READY",
+			mode: "monitor",
+			monitor: { strategy: "stream", triggers: [trigger] },
+		}, undefined, undefined, ctx);
+
+		expect(result.isError).toBe(true);
+		const error = result.content[0].text;
+		expect(error).toContain("monitor.triggers[0] must define exactly one matcher: literal or regex.");
+		expect(error).toContain(received);
+		expect(error).toContain("omit the other field entirely");
+		expect(error).toContain('An empty string ("") still counts as supplied.');
+		expect(error).toContain("Omit threshold unless comparing a numeric regex capture");
+		expect(error).toContain("No monitor process was started. Do not retry unchanged arguments.");
+		expect(error).not.toContain("fixture-secret");
+		expect(harness.getLaunchedCommand()).toBeUndefined();
+		expect(harness.getMonitorOptions()).toBeNull();
+
+		// The diagnostic's examples must be executable repairs, not just prose.
+		for (const kind of ["Literal", "Regex"]) {
+			const example = JSON.parse(error.match(new RegExp(`${kind} example: (.+)`))![1]);
+			const repaired = await harness.toolDef.execute(`repaired-${kind}`, {
+				command: "echo READY",
+				mode: "monitor",
+				monitor: { strategy: "stream", triggers: [example] },
+			}, undefined, undefined, ctx);
+			expect(repaired.isError).not.toBe(true);
+			expect(harness.getMonitorOptions()?.monitor?.triggers[0]?.match("READY")).toBe("READY");
+		}
+	});
+
 	it("rejects legacy monitorFilter usage after hard cutover", async () => {
 		const { toolDef } = await setupHarness();
 		const result = await toolDef.execute("call-1", {
@@ -306,6 +351,27 @@ describe("monitor mode", () => {
 
 		expect(result.isError).toBe(true);
 		expect(result.content[0].text).toContain("threshold requires regex matcher");
+		expect(result.content[0].text).toContain("Remove threshold for literal matching");
+	});
+
+	it("explains that captureGroup zero is not a numeric capture and starts no monitor", async () => {
+		const harness = await setupHarness();
+		const result = await harness.toolDef.execute("invalid-threshold", {
+			command: "echo READY",
+			mode: "monitor",
+			monitor: {
+				triggers: [{ id: "ready", regex: "/READY/", threshold: { captureGroup: 0, op: "gte", value: 0 } }],
+			},
+		}, undefined, undefined, {
+			hasUI: false,
+			cwd: "/tmp/project",
+			ui: {},
+			sessionManager: { getSessionFile: () => "/tmp/project/session.jsonl" },
+		} as any);
+		expect(result.isError).toBe(true);
+		expect(result.content[0].text).toContain("captureGroup must be an integer >= 1");
+		expect(result.content[0].text).toContain("Omit threshold for plain text or regex matching");
+		expect(harness.getLaunchedCommand()).toBeUndefined();
 	});
 
 	it("requires fileWatch config for file-watch strategy", async () => {

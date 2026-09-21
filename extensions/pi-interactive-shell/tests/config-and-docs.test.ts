@@ -154,6 +154,12 @@ describe("config + docs parity", () => {
 		expect(toolSchema).toContain('Structured \\`spawn\\` also supports a \\`prompt\\` field for Pi, Codex, Claude, and Cursor');
 		expect(toolSchema).toContain('This only types the text; it does not submit it.');
 		expect(toolSchema).toContain(`default: ${defaults.autoExitGracePeriod}ms`);
+		for (const text of [readme, skill, toolSchema]) {
+			expect(text).toContain("still counts as supplied");
+		}
+		expect(skill).toContain("Do not retry unchanged arguments");
+		expect(skill).toContain("no regex or threshold fields");
+		expect(toolSchema).toContain("Omit threshold unless comparing a numeric capture");
 
 		rmSync(root, { recursive: true, force: true });
 	});

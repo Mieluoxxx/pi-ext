@@ -75,6 +75,8 @@ For existing sessions, omit `command`, `spawn`, and `attach`. Use `submit: true`
 
 For monitors, use `mode: "monitor"` with a structured `monitor` object. File-watch monitors may omit `command`. Query monitor state or events with `monitorStatus` or `monitorEvents` plus `monitorSessionId` or `sessionId`.
 
+Start from the minimal example for the chosen operation, not a fully populated schema. Omit unused optional fields instead of filling them with empty strings, zeroes, `false`, or placeholder objects/arrays. Defaults belong to the tool; a supplied placeholder can activate a different validation branch.
+
 ```typescript
 interactive_shell({ sessionId: "shell-1", input: "/compact", submit: true })
 interactive_shell({ sessionId: "shell-1", kill: true })
@@ -155,6 +157,24 @@ interactive_shell({
 
 ### Monitor (Event-Driven, Headless)
 Run a background process and wake the agent on structured monitor triggers.
+
+**Per-trigger parameter rules:**
+- Supply exactly one non-empty string: `literal` **or** `regex`. Omit the other field entirely. An empty string (`""`) still counts as supplied, so `{ id: "ready", literal: "Local:", regex: "" }` is invalid.
+- Different triggers may use different matcher kinds; one trigger must never contain both.
+- Omit `threshold` for ordinary log/readiness matching. It is only for numeric regex captures; `captureGroup` starts at **1**, not 0, and the regex must contain the corresponding `(...)` capture.
+- Omit `poll`, `fileWatch`, and `detector` unless using those features. Do not copy their empty/default objects into a stream monitor call.
+
+**On validation failure:** no monitor process was started. Remove the conflicting/unused fields and rebuild the call from a minimal example. Do not retry unchanged arguments. If the same error recurs, stop calling the tool and inspect the schema/Skill rather than looping.
+
+Minimal readiness monitor (no regex or threshold fields):
+
+```typescript
+interactive_shell({
+  command: "npm run dev",
+  mode: "monitor",
+  monitor: { strategy: "stream", triggers: [{ id: "ready", literal: "Local:" }] }
+})
+```
 
 ```typescript
 interactive_shell({

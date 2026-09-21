@@ -242,11 +242,22 @@ function compileMonitorTrigger(trigger: MonitorTriggerConfig, index: number):
 	const regexPattern = typeof trigger.regex === "string" ? trigger.regex : undefined;
 	const matcherCount = (literalPattern === undefined ? 0 : 1) + (regexPattern === undefined ? 0 : 1);
 	if (matcherCount !== 1) {
-		return { ok: false, error: `monitor.triggers[${index}] must define exactly one matcher: literal or regex.` };
+		return {
+			ok: false,
+			error: [
+				`monitor.triggers[${index}] must define exactly one matcher: literal or regex.`,
+				matcherCount === 2 ? "Received both literal and regex string fields." : "Received neither literal nor regex as a string.",
+				'Set one non-empty matcher and omit the other field entirely. An empty string ("") still counts as supplied.',
+				'Literal example: {"id":"ready","literal":"READY"}',
+				'Regex example: {"id":"ready","regex":"/READY/"}',
+				"Omit threshold unless comparing a numeric regex capture (captureGroup >= 1).",
+				"No monitor process was started. Do not retry unchanged arguments.",
+			].join("\n"),
+		};
 	}
 
 	if (trigger.threshold && regexPattern === undefined) {
-		return { ok: false, error: `monitor.triggers[${index}].threshold requires regex matcher.` };
+		return { ok: false, error: `monitor.triggers[${index}].threshold requires regex matcher. Remove threshold for literal matching; do not send an unused threshold object. No monitor process was started.` };
 	}
 
 	if (literalPattern !== undefined) {
@@ -280,7 +291,7 @@ function compileMonitorTrigger(trigger: MonitorTriggerConfig, index: number):
 	const threshold = trigger.threshold;
 	if (threshold) {
 		if (!Number.isInteger(threshold.captureGroup) || threshold.captureGroup < 1) {
-			return { ok: false, error: `monitor.triggers[${index}].threshold.captureGroup must be an integer >= 1.` };
+			return { ok: false, error: `monitor.triggers[${index}].threshold.captureGroup must be an integer >= 1. Use 1 for the first (...) numeric capture, not 0 for the whole match. Omit threshold for plain text or regex matching without a numeric comparison. No monitor process was started.` };
 		}
 		if (!["lt", "lte", "gt", "gte"].includes(threshold.op)) {
 			return { ok: false, error: `monitor.triggers[${index}].threshold.op must be one of: lt, lte, gt, gte.` };
