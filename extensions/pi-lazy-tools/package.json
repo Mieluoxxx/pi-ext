@@ -1,9 +1,41 @@
 {
   "name": "@moguw/pi-lazy-tools",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "description": "Skill-led activation of existing Pi tools without duplicating their implementations",
+  "main": "index.ts",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "lazy-loading",
+    "capability",
+    "skills",
+    "tool-activation"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mieluoxxx/pi-ext.git",
+    "directory": "extensions/pi-lazy-tools"
+  },
+  "bugs": {
+    "url": "https://github.com/Mieluoxxx/pi-ext/issues"
+  },
+  "homepage": "https://github.com/Mieluoxxx/pi-ext/tree/main/extensions/pi-lazy-tools#readme",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "files": [
+    "index.ts",
+    "skills",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22.19.0"
+  },
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "test:reload": "node test/verify-reload.mjs"
