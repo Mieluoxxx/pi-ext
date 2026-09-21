@@ -18,6 +18,7 @@
 | `pi-tool-display` | 增加对 MCP 工具、Apply Patch 工具的渲染 | [MasuRii/pi-tool-display](https://github.com/MasuRii/pi-tool-display) @ `91cef75`（v0.5.0） |
 | `pi-hashline-edit-pro` | 增加 `disabledTools` 配置，可禁用与其它扩展冲突的工具 | [YuGiMob/pi-hashline-edit-pro](https://github.com/YuGiMob/pi-hashline-edit-pro) @ `77d545e`（v2.7.2，本地 patch 分支 `local/disabled-tools`） |
 | `pi-web-access` | Web 搜索、网页提取与视频理解；保留本地工具注册及内容检索修改 | [nicobailon/pi-web-access](https://github.com/nicobailon/pi-web-access) @ `597be04`（v0.24.2） |
+| `pi-openai-tools` | 上下文窗口、远程压缩 v2、图像生成/编辑、Astra 兼容及 apply_patch；不含托管搜索或 auto 审查 | [awoaCrim/pi-openai-toolkit](https://github.com/awoaCrim/pi-openai-toolkit) v0.14.5 源码快照（无 Git 元数据）；[code-yeongyu/pi-apply-patch](https://github.com/code-yeongyu/pi-apply-patch) @ `8f0d8a6` |
 
 ## 🧑‍💻 本地开发
 
@@ -37,6 +38,8 @@ pi -e ./extensions/pi-interactive-shell
 pi -e ./extensions/pi-tool-display
 pi -e ./extensions/pi-web-access
 ```
+
+`pi-openai-tools` 的配置、默认关闭项与迁移步骤见[包文档](extensions/pi-openai-tools/README.md)。使用前先移除或禁用独立 `git:github.com/code-yeongyu/pi-apply-patch`，再按文档安装本地包，避免同名工具冲突；本仓库不会自动安装或启用它。
 
 ## 🗂️ 仓库结构
 

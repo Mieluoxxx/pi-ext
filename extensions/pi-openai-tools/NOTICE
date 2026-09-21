@@ -1,0 +1,21 @@
+@moguw/pi-openai-tools
+
+Source integration of pi-openai-toolkit version 0.14.5 (source snapshot;
+no .git metadata was provided, so no toolkit commit is asserted), and
+code-yeongyu/pi-apply-patch version 0.1.2 at commit
+8f0d8a6ec67599305c19c92de328178e97522e1e.
+
+The toolkit's original MIT license (Copyright (c) 2026 lll9p) is preserved
+in LICENSE. Its unmodified NOTICE is in licenses/pi-openai-toolkit/NOTICE,
+including awoaCrim and contributors, Oh My Pi (Mario Zechner, Can Bölük,
+Stencil Labs, Inc.), and Igor Warzocha attribution. Its historical Web Search
+attribution is retained for provenance; that implementation is NOT included.
+
+The apply-patch original MIT license (Copyright (c) 2026 Yeongyu Kim) and
+NOTICE are preserved unmodified in licenses/pi-apply-patch/.
+
+Local adaptations: separate npm/workspace metadata, four explicit entries,
+operational config path pi-openai-tools, removal of hosted Web Search and
+auto-mode configuration/code, a type-safe read of the unchanged Astra input
+tail, and Node/Vitest regression tests. Persistent
+toolkit protocol markers and checkpoint formats retain their upstream names.
