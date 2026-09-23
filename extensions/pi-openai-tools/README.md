@@ -6,11 +6,19 @@
 
 ## 安装与迁移（由用户执行）
 
+发布后可直接安装独立 npm 包，不需要复制本机源码目录：
+
+```bash
+pi install npm:@moguw/pi-openai-tools
+```
+
+从本地来源迁移时先移除对应本地注册，再安装 npm 来源；以下旧扩展冲突检查同样适用。发布和安装本包都不复制用户的 `models.json`。
+
 先移除或禁用独立的 `git:github.com/code-yeongyu/pi-apply-patch`，再安装本包，避免重复注册 `apply_patch`。如还启用了 toolkit 的独立入口，也应禁用重复功能。
 
 **卸载前检查子代理配置：** 如果 worker 等代理的 `subagentOnlyExtensions` 或 `extensions` 仍指向旧安装目录中的 `pi-apply-patch/src/index.ts`，先将该引用改为新包的实际入口，例如：
 
-`/Users/moguw/workspace/pi-space/pi-ext/extensions/pi-openai-tools/extensions/apply-patch.ts`
+`/path/to/pi-ext/extensions/pi-openai-tools/extensions/apply-patch.ts`
 
 保留其工具白名单中的 `apply_patch`。否则卸载旧包后，子代理可能因入口文件不存在而无法加载。上述路径需按实际仓库位置调整；本包不会自动修改代理配置。
 
@@ -18,7 +26,7 @@
 # 先确认 pi list 中的实际来源；若使用固定 ref，应按实际来源移除
 pi remove git:github.com/code-yeongyu/pi-apply-patch
 # 然后安装本地整合包
-pi install /Users/moguw/workspace/pi-space/pi-ext/extensions/pi-openai-tools
+pi install /path/to/pi-ext/extensions/pi-openai-tools
 ```
 
 也可通过 `pi config` 禁用原独立扩展后再安装。本次打包**没有执行安装、卸载、启用或 reload**。安装后由用户在合适时机重启 Pi 或 `/reload`。不要同时加载本包与独立的相同工具。

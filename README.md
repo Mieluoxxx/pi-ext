@@ -19,6 +19,7 @@
 | `pi-hashline-edit-pro` | 增加 `disabledTools` 配置，可禁用与其它扩展冲突的工具 | [YuGiMob/pi-hashline-edit-pro](https://github.com/YuGiMob/pi-hashline-edit-pro) @ `77d545e`（v2.7.2，本地 patch 分支 `local/disabled-tools`） |
 | `pi-web-access` | Web 搜索、网页提取与视频理解；保留本地工具注册及内容检索修改 | [nicobailon/pi-web-access](https://github.com/nicobailon/pi-web-access) @ `597be04`（v0.24.2） |
 | `pi-openai-tools` | 上下文窗口、远程压缩 v2、图像生成/编辑、Astra 兼容及 apply_patch；不含托管搜索或 auto 审查 | [awoaCrim/pi-openai-toolkit](https://github.com/awoaCrim/pi-openai-toolkit) v0.14.5 源码快照（无 Git 元数据）；[code-yeongyu/pi-apply-patch](https://github.com/code-yeongyu/pi-apply-patch) @ `8f0d8a6` |
+| `pi-lazy-tools` | 按 Skill 启用已注册的工具组，减少常驻工具说明；不复制实现、认证或自动安装缺失工具 | 本仓库实现；[包文档](extensions/pi-lazy-tools/README.md) |
 
 ## 🧑‍💻 本地开发
 
