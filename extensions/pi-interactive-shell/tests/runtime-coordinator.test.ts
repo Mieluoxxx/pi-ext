@@ -6,7 +6,7 @@ describe("InteractiveShellCoordinator monitor state", () => {
 		const coordinator = new InteractiveShellCoordinator();
 		coordinator.registerMonitorSession("calm-reef", {
 			strategy: "stream",
-			triggers: [{ id: "error", literal: "ERROR" }, { id: "warn", literal: "WARN" }],
+			triggers: [{ id: "error", kind: "literal", pattern: "ERROR" }, { id: "warn", kind: "literal", pattern: "WARN" }],
 		}, new Date("2026-04-12T00:00:00.000Z"));
 
 		const first = coordinator.recordMonitorEvent({

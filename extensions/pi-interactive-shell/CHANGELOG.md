@@ -5,8 +5,17 @@ All notable changes to the `pi-interactive-shell` extension will be documented i
 ## [Unreleased]
 
 ### Changed
+- Require explicit tool actions and single-pattern `literal`/`regex`/`numeric` triggers. Migrate only unambiguous legacy calls before schema validation.
+- Require Pi/pi-ai 0.86.0+, prefer native strict sampling, and explicitly set non-strict Responses fallback only for this tool when supported.
+- Refresh bundled examples, Skill, and runtime follow-up hints for the action-based contract.
 - Integrated the fork into `Mieluoxxx/pi-ext` for scoped distribution as `@moguw/pi-interactive-shell`, maintained by Mieluoxxx.
 - Reworked the README as usage-focused documentation and removed the packaged banner and demo video.
+
+### Fixed
+- Report tool failures through Pi's exception contract instead of returning an ignored `isError` field.
+- Reject cross-action options before side effects; never turn `send`/`configure` into a query or coerce legacy selector strings into destructive actions.
+- Validate monitor semantics before creating worktrees, and clean up headless session resources on failed startup.
+- Preserve empty bracketed paste and intentional zero/false values; cover host execution, strict-schema round trips, and real process monitor lifecycles.
 
 ## [0.15.0] - 2026-08-13
 

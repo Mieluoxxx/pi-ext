@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 async function setupHarness() {
+	const session = { getOutput: vi.fn(() => ({ output: "", truncated: false, totalBytes: 0 })), getResult: vi.fn(), getStatus: () => "running", getRuntime: () => 0 };
 	const sessionManager = {
-		getActive: vi.fn(() => ({ })),
+		getActive: vi.fn(() => session),
 		writeToActive: vi.fn(() => true),
 		setActiveUpdateInterval: vi.fn(() => false),
 		setActiveQuietThreshold: vi.fn(() => false),
@@ -55,6 +56,7 @@ async function setupHarness() {
 		// TS narrows the closure-assigned local to null here; the runtime value is set by registerTool.
 		tool: registeredTool as { execute: (...args: any[]) => Promise<any> } | null,
 		sessionManager,
+		session,
 		ctx: {
 			cwd: "/tmp/project",
 			hasUI: true,
@@ -71,6 +73,33 @@ async function setupHarness() {
 }
 
 describe("interactive_shell submit input helper", () => {
+	it("sends an empty bracketed paste without falling back to a query", async () => {
+		const harness = await setupHarness();
+		await harness.tool!.execute("empty-paste", { action: "send", sessionId: "sess-1", inputPaste: "" }, undefined, undefined, harness.ctx);
+		expect(harness.sessionManager.writeToActive).toHaveBeenCalledWith("sess-1", "\x1b[200~\x1b[201~");
+		expect(harness.session.getOutput).not.toHaveBeenCalled();
+	});
+
+	it("reports unsupported configuration instead of querying the session", async () => {
+		const harness = await setupHarness();
+		await expect(harness.tool!.execute("configure", { action: "configure", sessionId: "sess-1", settings: { updateInterval: 5000 } }, undefined, undefined, harness.ctx)).rejects.toThrow("configuration");
+		expect(harness.session.getOutput).not.toHaveBeenCalled();
+	});
+
+	it.each([{ kill: "false" }, { kill: {} }, { background: "false" }, { monitorStatus: "false" }])("rejects invalid legacy selector types before touching a session: %j", async (selector) => {
+		const harness = await setupHarness();
+		await expect(harness.tool!.execute("invalid-selector", { sessionId: "sess-1", ...selector }, undefined, undefined, harness.ctx)).rejects.toThrow("must be boolean");
+		expect(harness.sessionManager.getActive).not.toHaveBeenCalled();
+	});
+
+	it("never sends input during an explicit read-only query", async () => {
+		const harness = await setupHarness();
+		await expect(harness.tool!.execute("invalid-query", {
+			action: "query", sessionId: "sess-1", input: "do not execute", submit: true,
+		}, undefined, undefined, harness.ctx)).rejects.toThrow("input is not allowed for action=query");
+		expect(harness.sessionManager.writeToActive).not.toHaveBeenCalled();
+	});
+
 	afterEach(() => {
 		vi.doUnmock("@earendil-works/pi-coding-agent");
 		vi.doUnmock("@earendil-works/pi-tui");
@@ -82,10 +111,10 @@ describe("interactive_shell submit input helper", () => {
 		expect(harness.tool).toBeTruthy();
 		expect((harness.tool as any).promptSnippet).toContain("submit=true");
 		expect((harness.tool as any).promptSnippet).toContain("existing session");
-		expect((harness.tool as any).promptSnippet).toContain("Do not combine command or spawn with sessionId or attach.");
-		expect((harness.tool as any).promptSnippet).toContain("operation was not performed");
-		expect((harness.tool as any).promptSnippet).toContain("monitorStatus/monitorEvents use monitorSessionId or sessionId.");
-		expect((harness.tool as any).description).toContain("A file-watch monitor may omit `command`.");
+		expect((harness.tool as any).promptSnippet).toContain("explicit action");
+		expect((harness.tool as any).promptSnippet).toContain("Validation errors perform no operation");
+		expect((harness.tool as any).description).toContain("monitor_status: sessionId");
+		expect((harness.tool as any).description).toContain("fileWatch instead of command/spawn");
 	});
 
 	it("appends Enter after plain text input when submit=true", async () => {

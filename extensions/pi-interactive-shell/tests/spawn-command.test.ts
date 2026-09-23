@@ -271,12 +271,10 @@ describe("/spawn command, shortcut, and tool spawn", () => {
 		const tool = harness.getTool();
 		expect(tool).toBeTruthy();
 
-		const result = await tool!.execute("call-1", {
+		await expect(tool!.execute("call-1", {
 			sessionId: "missing-session",
 			spawn: {},
-		}, undefined, undefined, harness.ctx as any);
-
-		expect(result.content[0].text).toBe("Session not found or no longer active: missing-session");
+		}, undefined, undefined, harness.ctx as any)).rejects.toThrow("Session not found or no longer active: missing-session");
 	});
 
 	it("interactive_shell rejects non-empty spawn requests for existing sessions", async () => {
@@ -284,14 +282,11 @@ describe("/spawn command, shortcut, and tool spawn", () => {
 		const tool = harness.getTool();
 		expect(tool).toBeTruthy();
 
-		const result = await tool!.execute("call-1", {
+		await expect(tool!.execute("call-1", {
 			sessionId: "existing-session",
 			spawn: { agent: "codex" },
-		}, undefined, undefined, harness.ctx as any);
-
-		expect(result.isError).toBe(true);
-		expect(result.content[0].text).toContain("'spawn' starts a new session only.");
-		expect(result.content[0].text).toContain("sessionId");
+		}, undefined, undefined, harness.ctx as any)).rejects.toThrow("sessionId is not allowed for action=start");
+		expect(harness.custom).not.toHaveBeenCalled();
 	});
 
 	it.each([
@@ -303,10 +298,8 @@ describe("/spawn command, shortcut, and tool spawn", () => {
 		const tool = harness.getTool();
 		expect(tool).toBeTruthy();
 
-		const result = await tool!.execute("call-1", params, undefined, undefined, harness.ctx as any);
-
-		expect(result.isError).toBe(true);
-		expect(result.content[0].text).toContain("Use exactly one session selector");
+		await expect(tool!.execute("call-1", params, undefined, undefined, harness.ctx as any)).rejects.toThrow("INVALID_ARGUMENTS");
+		expect(harness.custom).not.toHaveBeenCalled();
 	});
 
 	it("interactive_shell preserves standalone default spawn and explicit false worktree", async () => {
@@ -381,7 +374,7 @@ describe("/spawn command, shortcut, and tool spawn", () => {
 
 		expect(result.isError).not.toBe(true);
 		expect(result.content[0].text).toContain("Interactive session started:");
-		expect(result.content[0].text).toContain("interactive_shell({ sessionId:");
+		expect(result.content[0].text).toContain('interactive_shell({ action: "send", sessionId:');
 		expect(result.content[0].text).toContain("submit: true");
 		expect(result.details.mode).toBe("interactive");
 		expect(result.details.sessionId).toBe(harness.getLastOverlayOptions()?.sessionId);
@@ -427,13 +420,10 @@ describe("/spawn command, shortcut, and tool spawn", () => {
 		const tool = harness.getTool();
 		expect(tool).toBeTruthy();
 
-		const result = await tool!.execute("call-1", {
+		await expect(tool!.execute("call-1", {
 			spawn: { agent: "claude", mode: "fork" },
 			mode: "interactive",
-		}, undefined, undefined, harness.ctx as any);
-
-		expect(result.isError).toBe(true);
-		expect(result.content[0].text).toBe("Cannot fork claude. Fork is only supported for pi sessions.");
+		}, undefined, undefined, harness.ctx as any)).rejects.toThrow("Cannot fork claude. Fork is only supported for pi sessions.");
 	});
 
 	it("interactive_shell preserves the full missing-input guidance for new sessions", async () => {
@@ -441,9 +431,7 @@ describe("/spawn command, shortcut, and tool spawn", () => {
 		const tool = harness.getTool();
 		expect(tool).toBeTruthy();
 
-		const result = await tool!.execute("call-1", {}, undefined, undefined, harness.ctx as any);
-		expect(result.isError).toBe(true);
-		expect(result.content[0].text).toBe("One of 'command', 'spawn', 'sessionId', 'attach', 'listBackground', or 'dismissBackground' is required.");
+		await expect(tool!.execute("call-1", {}, undefined, undefined, harness.ctx as any)).rejects.toThrow("use an explicit action");
 	});
 
 	it("/spawn forwards transfer output back into the main agent conversation", async () => {

@@ -2,6 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { runInNewContext } from "node:vm";
+import { Check } from "typebox/value";
+import { toolParameters, type ToolParams } from "../tool-schema.ts";
+import { parseToolRequest } from "../tool-contract.ts";
 
 async function loadConfigModule(agentDir: string) {
 	vi.resetModules();
@@ -140,27 +144,47 @@ describe("config + docs parity", () => {
 		expect(readme).toContain(`Dispatch defaults \`autoExitOnQuiet: true\` — the session gets a 15s startup grace period`);
 		expect(readme).toContain("The completion notification identifies this as a quiet auto-close, not a user kill.");
 		expect(skill).toContain("enable_interactive_shell");
-		expect(skill).toContain("reloaded, new, resumed, and forked sessions reset it to inactive");
-		expect(skill).toContain("reports that completion reason separately from a user kill");
+		expect(skill).toContain("After reload or session replacement, check availability again");
+		expect(skill).toContain("Check the completion reason and actual result");
 		expect(toolSchema).toContain("reports that completion reason separately from a user kill");
 		expect(readme).toContain('submit: true');
 		expect(readme).toContain('raw `input` only types text. It does not submit the prompt.');
-		expect(skill).toContain("~8s of quiet");
+		expect(skill).toContain(`${defaults.handsFreeQuietThreshold / 1000}s of silence`);
+		expect(skill).toContain(`${defaults.autoExitGracePeriod / 1000}s startup grace period`);
 		expect(skill).toContain('submit: true');
-		expect(skill).toContain('raw `input` only types text. It does not submit the prompt.');
+		expect(skill).toContain('Raw `input` only types text');
 		expect(toolSchema).toContain(`default: ${defaults.handsFreeQuietThreshold}ms`);
 		expect(toolSchema).toContain('submit: true');
 		expect(toolSchema).toContain("or any custom key configured by the user");
-		expect(toolSchema).toContain('Structured \\`spawn\\` also supports a \\`prompt\\` field for Pi, Codex, Claude, and Cursor');
+		expect(toolSchema).toContain('Structured spawn supports a prompt field for Pi, Codex, Claude, and Cursor');
 		expect(toolSchema).toContain('This only types the text; it does not submit it.');
 		expect(toolSchema).toContain(`default: ${defaults.autoExitGracePeriod}ms`);
 		for (const text of [readme, skill, toolSchema]) {
-			expect(text).toContain("still counts as supplied");
+			expect(text).toContain("null");
 		}
 		expect(skill).toContain("Do not retry unchanged arguments");
-		expect(skill).toContain("no regex or threshold fields");
-		expect(toolSchema).toContain("Omit threshold unless comparing a numeric capture");
+		expect(skill).toContain("Omit `threshold` for literal/regex matching");
+		expect(toolSchema).toContain("Omit threshold for literal/regex");
 
 		rmSync(root, { recursive: true, force: true });
+	});
+
+	it("keeps the skill concise and its minimal examples schema-valid without starting processes", () => {
+		const skill = readFileSync("skills/pi-interactive-shell/SKILL.md", "utf-8");
+		expect(skill.split("\n").length).toBeLessThanOrEqual(120);
+		const calls: ToolParams[] = [];
+		for (const [, example] of skill.matchAll(/```typescript\n([\s\S]*?)```/g)) {
+			runInNewContext(example, { interactive_shell: (params: ToolParams) => calls.push(params) }, { timeout: 1000 });
+		}
+		expect(calls.length).toBeGreaterThan(0);
+		expect(calls.some(call => call.mode === "monitor")).toBe(true);
+		for (const call of calls) {
+			expect(Check(toolParameters, call)).toBe(true);
+			expect(parseToolRequest(call)).toEqual(call);
+			for (const trigger of call.monitor?.triggers ?? []) {
+				expect(trigger.pattern.length).toBeGreaterThan(0);
+				if (trigger.kind !== "numeric") expect(trigger.threshold).toBeUndefined();
+			}
+		}
 	});
 });

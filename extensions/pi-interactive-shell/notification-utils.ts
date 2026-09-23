@@ -10,7 +10,7 @@ export function buildDispatchNotification(sessionId: string, info: HeadlessCompl
 		parts.push(` ${info.completionOutput.totalLines} lines of output.`);
 	}
 	appendTailBlock(parts, info.completionOutput?.lines, BRIEF_TAIL_LINES);
-	parts.push(`\n\nAttach to review full output: interactive_shell({ attach: "${sessionId}" })`);
+	parts.push(`\n\nAttach to review full output: interactive_shell({ action: "attach", sessionId: "${sessionId}" })`);
 	return parts.join("");
 }
 

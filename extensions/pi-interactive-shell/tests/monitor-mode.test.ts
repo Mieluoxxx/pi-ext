@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { Agent } from "@earendil-works/pi-agent-core";
+import { createFauxCore, fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
 
 type MonitorOptionsCapture = {
 	monitor?: {
@@ -11,14 +13,18 @@ type MonitorOptionsCapture = {
 	onMonitorEvent?: (event: unknown) => void | Promise<void>;
 } | null;
 
-async function setupHarness() {
+async function setupHarness(failMonitor = false) {
 	let toolDef: any;
 	let monitorOptions: MonitorOptionsCapture = null;
 	let launchedCommand: string | undefined;
 	let monitorCompleteCallback: ((info: unknown) => void) | undefined;
 	const sendMessage = vi.fn();
+	const disposePty = vi.fn();
+	const handlers = new Map<string, (...args: any[]) => any>();
+	const execFileSync = vi.fn(() => { throw new Error("git must not run for invalid requests"); });
 
 	vi.resetModules();
+	vi.doMock("node:child_process", () => ({ execFileSync, spawn: vi.fn() }));
 	vi.doMock("@earendil-works/pi-coding-agent", () => ({
 		getAgentDir: () => "/tmp/pi-agent",
 	}));
@@ -88,7 +94,7 @@ async function setupHarness() {
 			write() {}
 			kill() {}
 			setEventHandlers() {}
-			dispose() {}
+			dispose() { disposePty(); }
 			getRawStream() { return ""; }
 		},
 	}));
@@ -102,6 +108,7 @@ async function setupHarness() {
 				onComplete: (info: unknown) => void,
 			) {
 				monitorOptions = options;
+				if (failMonitor) throw new Error("monitor initialization failed");
 				monitorCompleteCallback = onComplete;
 			}
 			getResult() { return undefined; }
@@ -138,13 +145,16 @@ async function setupHarness() {
 		registerTool: vi.fn((definition: any) => {
 			toolDef = definition;
 		}),
-		on: vi.fn(),
+		on: vi.fn((name, handler) => handlers.set(name, handler)),
 		events: { emit: vi.fn() },
 		sendMessage,
 	} as any);
 
 	return {
 		toolDef,
+		disposePty,
+		handlers,
+		execFileSync,
 		getMonitorOptions: () => monitorOptions,
 		getLaunchedCommand: () => launchedCommand,
 		getMonitorCompleteCallback: () => monitorCompleteCallback,
@@ -153,7 +163,99 @@ async function setupHarness() {
 }
 
 describe("monitor mode", () => {
+	it.each([
+		{ triggers: [{ id: "price", kind: "numeric", pattern: "price", threshold: { captureGroup: 1, op: "gte", value: 0 } }] },
+		{ triggers: [{ id: "ready", kind: "literal", pattern: "READY" }], detector: { detectorCommand: "   " } },
+	])("rejects impossible numeric captures and blank detector commands before launch: %j", async (monitor) => {
+		const harness = await setupHarness();
+		await expect(harness.toolDef.execute("invalid-monitor", { action: "start", command: "echo READY", mode: "monitor", monitor }, undefined, undefined, { hasUI: false, cwd: "/tmp/project", ui: {} })).rejects.toThrow();
+		expect(harness.getLaunchedCommand()).toBeUndefined();
+	});
+
+	it.each(["monitor", "dispatch"])("cleans up the launched PTY when %s initialization fails", async (mode) => {
+		const harness = await setupHarness(true);
+		const ctx = { hasUI: false, cwd: "/tmp/project", ui: {} };
+		await expect(harness.toolDef.execute("failed-start", {
+			action: "start", command: "echo READY", mode, background: true,
+			...(mode === "monitor" ? { monitor: { triggers: [{ id: "ready", kind: "literal", pattern: "READY" }] } } : {}),
+		}, undefined, undefined, ctx)).rejects.toThrow("monitor initialization failed");
+		expect(harness.disposePty).toHaveBeenCalledOnce();
+		const state = await harness.toolDef.execute("status", { action: "monitor_status", sessionId: "monitor-1" }, undefined, undefined, ctx);
+		expect(state.details.state).toBeNull();
+	});
+
+	it("records runtime validation failures as real Pi tool errors", async () => {
+		const harness = await setupHarness();
+		const faux = createFauxCore({});
+		faux.setResponses([
+			fauxAssistantMessage(fauxToolCall("interactive_shell", {
+				action: "start", command: "echo READY", mode: "monitor",
+				monitor: { triggers: [{ id: "ready", kind: "regex", pattern: "[fixture-secret" }] },
+			}), { stopReason: "toolUse" }),
+			fauxAssistantMessage("observed"),
+		]);
+		const ctx = { hasUI: false, cwd: "/tmp/project", ui: {} };
+		const agent = new Agent({
+			streamFn: faux.streamSimple,
+			initialState: { model: faux.getModel(), tools: [{ ...harness.toolDef, execute: (...args: any[]) => harness.toolDef.execute(...args, ctx) }] },
+		});
+		await agent.prompt("fixture");
+		const result = agent.state.messages.find(message => message.role === "toolResult");
+		expect(result?.isError).toBe(true);
+		expect(JSON.stringify(result?.content)).toContain("Invalid regular expression");
+		expect(JSON.stringify(result?.content)).not.toContain("fixture-secret");
+		expect(harness.getLaunchedCommand()).toBeUndefined();
+	});
+
+	it("sets explicit non-strict sampling only on its own Responses tool declarations", async () => {
+		const harness = await setupHarness();
+		const hook = harness.handlers.get("before_provider_request");
+		expect(hook).toBeDefined();
+		const own = { type: "function", name: "interactive_shell", parameters: {} };
+		const other = { type: "function", name: "other", parameters: {} };
+		const payload = { tools: [own, other], input: [{ type: "additional_tools", tools: [{ ...own, strict: null }] }] };
+		const result = hook!({ payload }, { model: { api: "openai-responses" } });
+		expect(result.tools[0].strict).toBe(false);
+		expect(result.input[0].tools[0].strict).toBe(false);
+		expect(result.tools[1]).toBe(other);
+		expect(own).not.toHaveProperty("strict");
+		expect(hook!({ payload }, { model: { api: "anthropic-messages" } })).toBeUndefined();
+		const strict = { tools: [{ ...own, strict: true }] };
+		expect(hook!({ payload: strict }, { model: { api: "openai-responses" } })).toBeUndefined();
+	});
+
+	it("starts a canonical single-pattern literal monitor", async () => {
+		const harness = await setupHarness();
+		const result = await harness.toolDef.execute("canonical", {
+			action: "start", command: "echo READY", mode: "monitor",
+			monitor: { triggers: [{ id: "ready", kind: "literal", pattern: "READY" }] },
+		}, undefined, undefined, { hasUI: false, cwd: "/tmp/project", ui: {} });
+		expect(result.details.mode).toBe("monitor");
+		expect(harness.getMonitorOptions()?.monitor?.triggers[0]?.match("READY")).toBe("READY");
+	});
+
+	it("validates monitor semantics before even invoking git for a spawn worktree", async () => {
+		const harness = await setupHarness();
+		await expect(harness.toolDef.execute("invalid-worktree", {
+			action: "start", spawn: { worktree: true }, mode: "monitor",
+			monitor: { strategy: "stream", poll: { intervalMs: 5000 }, triggers: [{ id: "ready", kind: "literal", pattern: "READY" }] },
+		}, undefined, undefined, { hasUI: false, cwd: "/tmp/project", ui: {} })).rejects.toThrow("monitor.poll");
+		expect(harness.execFileSync).not.toHaveBeenCalled();
+		expect(harness.getLaunchedCommand()).toBeUndefined();
+	});
+
+	it("throws at the tool boundary when monitor validation fails", async () => {
+		const { toolDef } = await setupHarness();
+		await expect(toolDef.execute("invalid", { command: "echo READY", mode: "monitor" }, undefined, undefined, {
+			hasUI: false,
+			cwd: "/tmp/project",
+			ui: {},
+			sessionManager: { getSessionFile: () => "/tmp/project/session.jsonl" },
+		})).rejects.toThrow("requires monitor configuration");
+	});
+
 	afterEach(() => {
+		vi.doUnmock("node:child_process");
 		vi.doUnmock("@earendil-works/pi-coding-agent");
 		vi.doUnmock("@earendil-works/pi-tui");
 		vi.doUnmock("../config.ts");
@@ -166,7 +268,7 @@ describe("monitor mode", () => {
 
 	it("requires monitor object when mode is monitor", async () => {
 		const { toolDef } = await setupHarness();
-		const result = await toolDef.execute("call-1", {
+		await expect(toolDef.execute("call-1", {
 			command: "npm test",
 			mode: "monitor",
 		}, undefined, undefined, {
@@ -174,10 +276,7 @@ describe("monitor mode", () => {
 			cwd: "/tmp/project",
 			ui: {},
 			sessionManager: { getSessionFile: () => "/tmp/project/session.jsonl" },
-		} as any);
-
-		expect(result.isError).toBe(true);
-		expect(result.content[0].text).toBe("mode='monitor' requires monitor configuration.");
+		} as any)).rejects.toThrow("requires monitor configuration");
 	});
 
 	it("wires compiled monitor config and callback for monitor mode", async () => {
@@ -206,11 +305,9 @@ describe("monitor mode", () => {
 
 	it.each([
 		{ name: "both matchers", trigger: { id: "ready", literal: "fixture-secret-literal", regex: "/fixture-secret-regex/" }, received: "Received both literal and regex string fields." },
-		{ name: "empty regex placeholder", trigger: { id: "ready", literal: "READY", regex: "" }, received: "Received both literal and regex string fields." },
-		{ name: "empty literal placeholder", trigger: { id: "ready", literal: "", regex: "/READY/" }, received: "Received both literal and regex string fields." },
 		{ name: "two empty placeholders", trigger: { id: "ready", literal: "", regex: "" }, received: "Received both literal and regex string fields." },
 		{ name: "missing matcher", trigger: { id: "ready" }, received: "Received neither literal nor regex as a string." },
-	])("explains how to repair $name without launching or echoing matcher values", async ({ trigger, received }) => {
+	])("rejects ambiguous legacy $name without launching or echoing matcher values", async ({ trigger }) => {
 		const harness = await setupHarness();
 		const ctx = {
 			hasUI: false,
@@ -218,27 +315,20 @@ describe("monitor mode", () => {
 			ui: {},
 			sessionManager: { getSessionFile: () => "/tmp/project/session.jsonl" },
 		} as any;
-		const result = await harness.toolDef.execute("invalid", {
+		const result = harness.toolDef.execute("invalid", {
 			command: "echo READY",
 			mode: "monitor",
 			monitor: { strategy: "stream", triggers: [trigger] },
 		}, undefined, undefined, ctx);
 
-		expect(result.isError).toBe(true);
-		const error = result.content[0].text;
-		expect(error).toContain("monitor.triggers[0] must define exactly one matcher: literal or regex.");
-		expect(error).toContain(received);
-		expect(error).toContain("omit the other field entirely");
-		expect(error).toContain('An empty string ("") still counts as supplied.');
-		expect(error).toContain("Omit threshold unless comparing a numeric regex capture");
-		expect(error).toContain("No monitor process was started. Do not retry unchanged arguments.");
-		expect(error).not.toContain("fixture-secret");
+		await expect(result).rejects.toThrow("unambiguous matcher");
+		await expect(result).rejects.not.toThrow("fixture-secret");
 		expect(harness.getLaunchedCommand()).toBeUndefined();
 		expect(harness.getMonitorOptions()).toBeNull();
 
-		// The diagnostic's examples must be executable repairs, not just prose.
-		for (const kind of ["Literal", "Regex"]) {
-			const example = JSON.parse(error.match(new RegExp(`${kind} example: (.+)`))![1]);
+		// Both canonical repairs must remain executable.
+		for (const kind of ["literal", "regex"]) {
+			const example = { id: "ready", kind, pattern: "READY" };
 			const repaired = await harness.toolDef.execute(`repaired-${kind}`, {
 				command: "echo READY",
 				mode: "monitor",
@@ -248,10 +338,15 @@ describe("monitor mode", () => {
 			expect(harness.getMonitorOptions()?.monitor?.triggers[0]?.match("READY")).toBe("READY");
 		}
 	});
+	it.each([{ id: "ready", literal: "READY", regex: "" }, { id: "ready", literal: "", regex: "/READY/" }])("migrates a legacy matcher with one empty counterpart: %j", async (trigger) => {
+		const harness = await setupHarness();
+		await harness.toolDef.execute("legacy", { command: "echo READY", mode: "monitor", monitor: { triggers: [trigger] } }, undefined, undefined, { hasUI: false, cwd: "/tmp/project", ui: {} });
+		expect(harness.getMonitorOptions()?.monitor?.triggers[0]?.match("READY")).toBe("READY");
+	});
 
 	it("rejects legacy monitorFilter usage after hard cutover", async () => {
 		const { toolDef } = await setupHarness();
-		const result = await toolDef.execute("call-1", {
+		await expect(toolDef.execute("call-1", {
 			command: "tail -f logs/dev.log",
 			mode: "monitor",
 			monitorFilter: "/tmp/log",
@@ -260,25 +355,19 @@ describe("monitor mode", () => {
 			cwd: "/tmp/project",
 			ui: {},
 			sessionManager: { getSessionFile: () => "/tmp/project/session.jsonl" },
-		} as any);
-
-		expect(result.isError).toBe(true);
-		expect(result.content[0].text).toContain("monitorFilter was removed");
+		} as any)).rejects.toThrow("monitorFilter was removed");
 	});
 
 	it("requires target session when querying monitorEvents", async () => {
 		const { toolDef } = await setupHarness();
-		const result = await toolDef.execute("call-1", {
+		await expect(toolDef.execute("call-1", {
 			monitorEvents: true,
 		}, undefined, undefined, {
 			hasUI: false,
 			cwd: "/tmp/project",
 			ui: {},
 			sessionManager: { getSessionFile: () => "/tmp/project/session.jsonl" },
-		} as any);
-
-		expect(result.isError).toBe(true);
-		expect(result.content[0].text).toContain("monitorEvents requires monitorSessionId");
+		} as any)).rejects.toThrow("monitor_events requires sessionId");
 	});
 
 	it("wraps poll-diff monitor command into a recurring loop", async () => {
@@ -331,7 +420,7 @@ describe("monitor mode", () => {
 
 	it("rejects threshold config on literal triggers", async () => {
 		const { toolDef } = await setupHarness();
-		const result = await toolDef.execute("call-1", {
+		await expect(toolDef.execute("call-1", {
 			command: "echo test",
 			mode: "monitor",
 			monitor: {
@@ -347,16 +436,12 @@ describe("monitor mode", () => {
 			cwd: "/tmp/project",
 			ui: {},
 			sessionManager: { getSessionFile: () => "/tmp/project/session.jsonl" },
-		} as any);
-
-		expect(result.isError).toBe(true);
-		expect(result.content[0].text).toContain("threshold requires regex matcher");
-		expect(result.content[0].text).toContain("Remove threshold for literal matching");
+		} as any)).rejects.toThrow("threshold is only allowed for kind=numeric");
 	});
 
 	it("explains that captureGroup zero is not a numeric capture and starts no monitor", async () => {
 		const harness = await setupHarness();
-		const result = await harness.toolDef.execute("invalid-threshold", {
+		await expect(harness.toolDef.execute("invalid-threshold", {
 			command: "echo READY",
 			mode: "monitor",
 			monitor: {
@@ -367,16 +452,13 @@ describe("monitor mode", () => {
 			cwd: "/tmp/project",
 			ui: {},
 			sessionManager: { getSessionFile: () => "/tmp/project/session.jsonl" },
-		} as any);
-		expect(result.isError).toBe(true);
-		expect(result.content[0].text).toContain("captureGroup must be an integer >= 1");
-		expect(result.content[0].text).toContain("Omit threshold for plain text or regex matching");
+		} as any)).rejects.toThrow("captureGroup");
 		expect(harness.getLaunchedCommand()).toBeUndefined();
 	});
 
 	it("requires fileWatch config for file-watch strategy", async () => {
 		const { toolDef } = await setupHarness();
-		const result = await toolDef.execute("call-1", {
+		await expect(toolDef.execute("call-1", {
 			mode: "monitor",
 			monitor: {
 				strategy: "file-watch",
@@ -387,10 +469,7 @@ describe("monitor mode", () => {
 			cwd: "/tmp/project",
 			ui: {},
 			sessionManager: { getSessionFile: () => "/tmp/project/session.jsonl" },
-		} as any);
-
-		expect(result.isError).toBe(true);
-		expect(result.content[0].text).toContain("monitor.fileWatch is required");
+		} as any)).rejects.toThrow("monitor.fileWatch is required");
 	});
 
 	it("builds generated command for file-watch strategy beside an empty spawn placeholder", async () => {

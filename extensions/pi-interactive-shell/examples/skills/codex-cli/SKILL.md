@@ -115,12 +115,14 @@ For delegated fire-and-forget runs, prefer `mode: "dispatch"` so the agent is no
 ```typescript
 // Delegated run with completion notification (recommended default)
 interactive_shell({
+  action: "start",
   command: 'codex "Review this codebase for security issues"',
   mode: "dispatch"
 })
 
 // Override reasoning effort for a single delegated run
 interactive_shell({
+  action: "start",
   command: 'codex -c model_reasoning_effort="xhigh" "Complex refactor task"',
   mode: "dispatch"
 })

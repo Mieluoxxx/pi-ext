@@ -5,6 +5,7 @@ Run interactive CLIs inside observable [Pi](https://pi.dev) TUI overlays. Pi can
 ## Requirements
 
 - Node.js 22.19 or newer
+- Pi 0.86.0 or newer (including pi-ai's optional-null normalization)
 - Pi interactive TUI mode for overlays
 - `zigpty` support for the current platform
 
@@ -50,22 +51,25 @@ Dispatch defaults `autoExitOnQuiet: true` — the session gets a 15s startup gra
 
 ### Start A Session
 
-Use exactly one lifecycle selector: `command`, a non-empty `spawn`, `sessionId`, or `attach`.
+Choose an explicit `action`. For `start`, supply `command` or `spawn`, never both. Omit unused fields; strict structured calls may use `null` instead. Empty strings, zeroes, and `false` are values, not absence.
 
 ```typescript
-interactive_shell({ command: "vim package.json" })
+interactive_shell({ action: "start", command: "vim package.json" })
 
 interactive_shell({
+  action: "start",
   spawn: { agent: "pi", prompt: "Review the current changes" },
   mode: "dispatch",
 })
 
 interactive_shell({
+  action: "start",
   spawn: { agent: "cursor", prompt: "Review the diffs" },
   mode: "dispatch",
 })
 
 interactive_shell({
+  action: "start",
   spawn: { agent: "claude", prompt: "Review the diffs" },
   mode: "hands-free",
 })
@@ -78,11 +82,12 @@ Raw `command` is suitable for arbitrary CLIs. Structured `spawn` applies the con
 Use the returned `sessionId` for every follow-up operation:
 
 ```typescript
-interactive_shell({ sessionId: "calm-reef" })
-interactive_shell({ sessionId: "calm-reef", input: "/compact", submit: true })
-interactive_shell({ sessionId: "calm-reef", inputKeys: ["ctrl+c"] })
-interactive_shell({ sessionId: "calm-reef", background: true })
-interactive_shell({ sessionId: "calm-reef", kill: true })
+interactive_shell({ action: "query", sessionId: "calm-reef" })
+interactive_shell({ action: "send", sessionId: "calm-reef", input: "/compact", submit: true })
+interactive_shell({ action: "send", sessionId: "calm-reef", inputKeys: ["ctrl+c"] })
+interactive_shell({ action: "configure", sessionId: "calm-reef", settings: { quietThreshold: 8000 } })
+interactive_shell({ action: "background", sessionId: "calm-reef" })
+interactive_shell({ action: "kill", sessionId: "calm-reef" })
 ```
 
 For editor-based TUIs, raw `input` only types text. It does not submit the prompt. Add `submit: true` or `inputKeys: ["enter"]` to submit it.
@@ -90,29 +95,28 @@ For editor-based TUIs, raw `input` only types text. It does not submit the promp
 Background sessions can be listed, reattached, or dismissed:
 
 ```typescript
-interactive_shell({ listBackground: true })
-interactive_shell({ attach: "calm-reef", mode: "hands-free" })
-interactive_shell({ dismissBackground: "calm-reef" })
+interactive_shell({ action: "list" })
+interactive_shell({ action: "attach", sessionId: "calm-reef", mode: "hands-free" })
+interactive_shell({ action: "dismiss", sessionId: "calm-reef" })
 ```
 
 ### Monitor A Process
 
 Match output from a long-running command:
 
-Each trigger must supply exactly one non-empty `literal` or `regex`; omit the
-other field entirely. An empty string (`""`) still counts as supplied.
-Omit `threshold` unless comparing a numeric regex capture (`captureGroup >= 1`).
-Start from a minimal example instead of filling unused optional fields with
-placeholders. A validation error means no monitor process was started: correct
-the parameters before retrying, never repeat the unchanged invalid call.
+Each trigger has one `kind` (`literal`, `regex`, or `numeric`) and a non-empty `pattern`.
+Only `numeric` accepts and requires `threshold`, with `captureGroup >= 1`.
+Omit unused options, or use `null` under strict sampling; do not invent placeholders.
+Validation finishes before any process or worktree is created. Correct invalid parameters before retrying.
 
 ```typescript
 interactive_shell({
+  action: "start",
   command: "pnpm test -- --watch",
   mode: "monitor",
   monitor: {
     strategy: "stream",
-    triggers: [{ id: "failed", literal: "FAIL" }],
+    triggers: [{ id: "failed", kind: "literal", pattern: "FAIL" }],
   },
 })
 ```
@@ -121,6 +125,7 @@ Watch files without starting a command:
 
 ```typescript
 interactive_shell({
+  action: "start",
   mode: "monitor",
   monitor: {
     strategy: "file-watch",
@@ -129,7 +134,7 @@ interactive_shell({
       recursive: true,
       events: ["rename", "change"],
     },
-    triggers: [{ id: "pdf", regex: "/\\.pdf$/i" }],
+    triggers: [{ id: "pdf", kind: "regex", pattern: "/\\.pdf$/i" }],
   },
 })
 ```
@@ -137,9 +142,26 @@ interactive_shell({
 Query monitor state and events with the monitor session id:
 
 ```typescript
-interactive_shell({ monitorStatus: true, monitorSessionId: "calm-reef" })
-interactive_shell({ monitorEvents: true, monitorSessionId: "calm-reef" })
+interactive_shell({ action: "monitor_status", sessionId: "calm-reef" })
+interactive_shell({ action: "monitor_events", sessionId: "calm-reef" })
 ```
+
+For polling, use `strategy: "poll-diff"` with `command` and optional `poll: { intervalMs: 5000 }`; do not include `fileWatch`. For numeric comparisons:
+
+```typescript
+interactive_shell({
+  action: "start", command: "tail -f prices.log", mode: "monitor",
+  monitor: { triggers: [{ id: "price", kind: "numeric", pattern: "/price=(\\d+)/", threshold: { captureGroup: 1, op: "gte", value: 0 } }] }
+})
+```
+
+### Compatibility and errors
+
+- Unambiguous pre-action calls are migrated by `prepareArguments`, including old `literal`/`regex` matchers. Conflicting selectors, two non-empty matchers, and dummy numeric comparisons are rejected rather than guessed away. The public schema exposes only the new contract.
+- Strict-capable providers use Pi's preferred JSON-schema constrained sampling. Unused fields become nullable and Pi normalizes their `null` values before validation.
+- On Responses APIs, this extension makes omitted/null `strict` explicitly `false` only on its own function declarations, including dynamically added tools. Explicit `strict: true`, other tools, and `compat.supportsStrictMode: false` are left untouched. It does not change global provider configuration. Gateways must honor the resulting schema; verify the wire request if a gateway still fills non-null placeholders.
+- Tool errors are thrown so Pi records `isError: true`. A launch failure cleans up its unretained session resources; any worktree left in place is reported. A process that started and then failed instead emits a lifecycle notification with its exit status.
+- After upgrading, run `/reload` to refresh both tool schemas and Skill instructions. Existing slash commands and session IDs are unchanged.
 
 ## Keyboard Shortcuts
 
@@ -177,7 +199,7 @@ Global and project configuration files are merged, with project values taking pr
 }
 ```
 
-Set `defer` to `true` to register only `enable_interactive_shell` at startup. Calling that loader activates `interactive_shell` for the current Pi process. See [`skills/pi-interactive-shell/SKILL.md`](./skills/pi-interactive-shell/SKILL.md) for the complete tool reference.
+Set `defer` to `true` to initially expose only `enable_interactive_shell`. Calling that loader activates `interactive_shell` for the current session; reload or session replacement resets availability. See [`skills/pi-interactive-shell/SKILL.md`](./skills/pi-interactive-shell/SKILL.md) for the concise agent workflow.
 
 ## Limitations
 

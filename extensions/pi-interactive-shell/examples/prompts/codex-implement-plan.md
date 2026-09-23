@@ -29,6 +29,6 @@ Determine the model flag:
 
 Then launch Codex CLI in the interactive shell overlay with that meta prompt using the chosen model flag plus `-a never`.
 
-Use `interactive_shell` with `mode: "dispatch"` for this delegated run (fire-and-forget with completion notification). Do NOT pass sandbox flags in interactive_shell. Dispatch mode only. End turn immediately. Do not poll. Wait for completion notification.
+Use `interactive_shell` with `action: "start", mode: "dispatch"` for this delegated run (fire-and-forget with completion notification). Do NOT pass sandbox flags in interactive_shell. Dispatch mode only. End turn immediately. Do not poll. Wait for completion notification.
 
 $@

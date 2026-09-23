@@ -37,9 +37,9 @@ description: Cursor CLI reference. Use when running Cursor in interactive_shell 
 Use structured spawn when you want the extension's shared spawn resolver/defaults/worktree support:
 
 ```typescript
-interactive_shell({ spawn: { agent: "cursor" }, mode: "interactive" })
-interactive_shell({ spawn: { agent: "cursor", prompt: "Review the diffs" }, mode: "dispatch" })
-interactive_shell({ spawn: { agent: "cursor", worktree: true }, mode: "hands-free" })
+interactive_shell({ action: "start", spawn: { agent: "cursor" }, mode: "interactive" })
+interactive_shell({ action: "start", spawn: { agent: "cursor", prompt: "Review the diffs" }, mode: "dispatch" })
+interactive_shell({ action: "start", spawn: { agent: "cursor", worktree: true }, mode: "hands-free" })
 ```
 
 Structured spawn launches Cursor via the configured `spawn.commands.cursor` executable (default: `agent`) and appends prompt text as Cursor's native interactive startup form (`agent "prompt"`). By default, spawn args include `--model composer-2-fast`, which selects Cursor's Composer 2 Fast model explicitly.

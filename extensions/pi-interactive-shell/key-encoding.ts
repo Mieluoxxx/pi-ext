@@ -257,7 +257,7 @@ export function translateInput(input: InputSpec): string {
 	}
 
 	// Bracketed paste
-	if (input.paste) {
+	if (input.paste !== undefined) {
 		result += encodePaste(input.paste);
 	}
 

@@ -18,7 +18,7 @@ import type {
 import { sessionManager, generateSessionId } from "./session-manager.ts";
 import { loadConfig } from "./config.ts";
 import type { InteractiveShellConfig } from "./config.ts";
-import { isEmptySpawnPlaceholder, normalizeSpawnRequest, parseSpawnArgs, resolveSpawn, type SpawnRequest } from "./spawn.ts";
+import { parseSpawnArgs, resolveSpawn, type SpawnRequest } from "./spawn.ts";
 import { translateInput, type InputSpec } from "./key-encoding.ts";
 import {
 	ENABLE_TOOL_DESCRIPTION,
@@ -43,6 +43,7 @@ import { buildDispatchNotification, buildHandsFreeUpdateMessage, buildMonitorEve
 import { createSessionQueryState, getSessionOutput } from "./session-query.ts";
 import { InteractiveShellCoordinator } from "./runtime-coordinator.ts";
 import { spawn as spawnChildProcess } from "node:child_process";
+import { explicitResponsesStrictness, parseToolRequest, prepareToolArguments } from "./tool-contract.ts";
 
 const coordinator = new InteractiveShellCoordinator();
 const SIDE_CHAT_SHORTCUT = "alt+/";
@@ -222,11 +223,8 @@ function parseRegexPattern(value: string): { ok: true; regex: RegExp } | { ok: f
 
 	try {
 		return { ok: true, regex: new RegExp(source, flags) };
-	} catch (error) {
-		if (error instanceof Error) {
-			return { ok: false, error: `Invalid regex '${value}': ${error.message}` };
-		}
-		return { ok: false, error: `Invalid regex '${value}'.` };
+	} catch {
+		return { ok: false, error: "Invalid regular expression." };
 	}
 }
 
@@ -238,33 +236,14 @@ function compileMonitorTrigger(trigger: MonitorTriggerConfig, index: number):
 		return { ok: false, error: `monitor.triggers[${index}] requires non-empty id.` };
 	}
 
-	const literalPattern = typeof trigger.literal === "string" ? trigger.literal : undefined;
-	const regexPattern = typeof trigger.regex === "string" ? trigger.regex : undefined;
-	const matcherCount = (literalPattern === undefined ? 0 : 1) + (regexPattern === undefined ? 0 : 1);
-	if (matcherCount !== 1) {
-		return {
-			ok: false,
-			error: [
-				`monitor.triggers[${index}] must define exactly one matcher: literal or regex.`,
-				matcherCount === 2 ? "Received both literal and regex string fields." : "Received neither literal nor regex as a string.",
-				'Set one non-empty matcher and omit the other field entirely. An empty string ("") still counts as supplied.',
-				'Literal example: {"id":"ready","literal":"READY"}',
-				'Regex example: {"id":"ready","regex":"/READY/"}',
-				"Omit threshold unless comparing a numeric regex capture (captureGroup >= 1).",
-				"No monitor process was started. Do not retry unchanged arguments.",
-			].join("\n"),
-		};
+	if (trigger.kind !== "numeric" && trigger.threshold !== undefined) {
+		return { ok: false, error: `monitor.triggers[${index}].threshold is only allowed for kind=numeric. Omit it for literal/regex matching. No monitor process was started.` };
 	}
-
-	if (trigger.threshold && regexPattern === undefined) {
-		return { ok: false, error: `monitor.triggers[${index}].threshold requires regex matcher. Remove threshold for literal matching; do not send an unused threshold object. No monitor process was started.` };
+	if (trigger.kind === "numeric" && !trigger.threshold) {
+		return { ok: false, error: `monitor.triggers[${index}].threshold is required for kind=numeric. No monitor process was started.` };
 	}
-
-	if (literalPattern !== undefined) {
-		const literal = literalPattern.trim();
-		if (!literal) {
-			return { ok: false, error: `monitor.triggers[${index}].literal cannot be empty.` };
-		}
+	if (trigger.kind === "literal") {
+		const literal = trigger.pattern;
 		return {
 			ok: true,
 			compiled: {
@@ -279,19 +258,20 @@ function compileMonitorTrigger(trigger: MonitorTriggerConfig, index: number):
 		};
 	}
 
-	if (regexPattern === undefined) {
-		return { ok: false, error: `monitor.triggers[${index}] must define exactly one matcher: literal or regex.` };
-	}
-
-	const parsed = parseRegexPattern(regexPattern);
+	const parsed = parseRegexPattern(trigger.pattern);
 	if (!parsed.ok) {
-		return { ok: false, error: `monitor.triggers[${index}].regex ${parsed.error}` };
+		return { ok: false, error: `monitor.triggers[${index}].pattern: ${parsed.error} No monitor process was started.` };
 	}
 
 	const threshold = trigger.threshold;
 	if (threshold) {
 		if (!Number.isInteger(threshold.captureGroup) || threshold.captureGroup < 1) {
 			return { ok: false, error: `monitor.triggers[${index}].threshold.captureGroup must be an integer >= 1. Use 1 for the first (...) numeric capture, not 0 for the whole match. Omit threshold for plain text or regex matching without a numeric comparison. No monitor process was started.` };
+		}
+		// The empty alternative exposes capture slots without requiring matching input.
+		const captureCount = new RegExp(`${parsed.regex.source}|`, parsed.regex.flags).exec("")!.length - 1;
+		if (threshold.captureGroup > captureCount) {
+			return { ok: false, error: `monitor.triggers[${index}].threshold.captureGroup does not exist in pattern. No monitor process was started.` };
 		}
 		if (!["lt", "lte", "gt", "gte"].includes(threshold.op)) {
 			return { ok: false, error: `monitor.triggers[${index}].threshold.op must be one of: lt, lte, gt, gte.` };
@@ -312,7 +292,7 @@ function compileMonitorTrigger(trigger: MonitorTriggerConfig, index: number):
 				if (!match) return undefined;
 				if (!threshold) return match[0];
 				const captured = match[threshold.captureGroup];
-				if (captured === undefined) return undefined;
+				if (captured === undefined || !captured.trim()) return undefined;
 				const numeric = Number(captured);
 				if (!Number.isFinite(numeric)) return undefined;
 				if (!compareThreshold(numeric, threshold.op, threshold.value)) return undefined;
@@ -370,6 +350,9 @@ function compileMonitorConfig(raw: MonitorConfig | undefined):
 		: undefined;
 
 	const detectorCommand = raw.detector?.detectorCommand?.trim();
+	if (raw.detector && !detectorCommand) {
+		return { ok: false, error: "monitor.detector.detectorCommand cannot be blank. No monitor process was started." };
+	}
 	const detector = detectorCommand
 		? {
 			detectorCommand,
@@ -686,6 +669,20 @@ function appendWorktreeNotice(text: string, worktreePath: string | undefined): s
 	return `${text}\nWorktree left in place: ${worktreePath}`;
 }
 
+function failHeadlessStart(id: string, session: PtyTerminalSession | undefined, error: unknown, worktreePath?: string): never {
+	const message = error instanceof Error ? error.message : String(error);
+	try {
+		coordinator.disposeMonitor(id);
+		coordinator.clearMonitorEvents(id);
+		if (sessionManager.get(id)) sessionManager.remove(id);
+		else session?.dispose();
+		sessionManager.unregisterActive(id, true);
+	} catch (cleanupError) {
+		throw new Error(appendWorktreeNotice(`Startup failed: ${message}. Cleanup failed for ${id}; resources may remain: ${String(cleanupError)}`, worktreePath));
+	}
+	throw new Error(appendWorktreeNotice(`Startup failed: ${message}. No active session was retained.`, worktreePath));
+}
+
 export default function interactiveShellExtension(pi: ExtensionAPI) {
 	const startupConfig = loadConfig(process.cwd());
 	const supportsDeferredTools = typeof pi.getActiveTools === "function" && typeof pi.setActiveTools === "function";
@@ -790,6 +787,11 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 		const config = loadRuntimeConfig(effectiveCwd);
 		const effectiveMode = mode ?? "interactive";
 		const isMonitorMode = effectiveMode === "monitor";
+		// Validate before resolveSpawn can create a worktree or any session resources.
+		const monitorValidation = isMonitorMode ? compileMonitorConfig(monitor) : undefined;
+		if (monitorValidation && !monitorValidation.ok) {
+			return { content: [{ type: "text", text: monitorValidation.error }], isError: true };
+		}
 		const returnsImmediately = effectiveMode === "interactive" || effectiveMode === "hands-free" || effectiveMode === "dispatch" || isMonitorMode;
 		const hasUI = ctx.hasUI !== false;
 
@@ -837,15 +839,8 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 			spawnAgent = resolvedSpawn.spawn.agent;
 			spawnMode = resolvedSpawn.spawn.mode;
 		}
-		if (isMonitorMode) {
-			const compiledMonitor = compileMonitorConfig(monitor);
-			if (!compiledMonitor.ok) {
-				return {
-					content: [{ type: "text", text: compiledMonitor.error }],
-					isError: true,
-				};
-			}
-			const compiled = compiledMonitor.compiled;
+		if (monitorValidation?.ok) {
+			const compiled = monitorValidation.compiled;
 
 			let sessionCommand: string;
 			let monitorCommand: string;
@@ -865,23 +860,27 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 			}
 
 			const id = generateSessionId(name);
-			const session = new PtyTerminalSession(
-				{ command: monitorCommand, cwd: effectiveCwd, cols: 120, rows: 40, scrollback: config.scrollbackLines },
-			);
-			const startTime = Date.now();
-			sessionManager.add(sessionCommand, session, name, effectiveReason, { id, noAutoCleanup: true, startedAt: new Date(startTime) });
-
-			coordinator.registerMonitorSession(id, compiled.publicConfig, new Date(startTime));
-			const monitorRunner = new HeadlessDispatchMonitor(session, config, {
-				autoExitOnQuiet: handsFree?.autoExitOnQuiet === true,
-				quietThreshold: handsFree?.quietThreshold ?? config.handsFreeQuietThreshold,
-				gracePeriod: handsFree?.gracePeriod ?? config.autoExitGracePeriod,
-				timeout,
-				startedAt: startTime,
-				monitor: compiled.runtime,
-				onMonitorEvent: makeMonitorEventCallback(pi, id, compiled, effectiveCwd),
-			}, makeStructuredMonitorCompletionCallback(pi, id));
-			registerHeadlessActive(id, sessionCommand, effectiveReason, session, monitorRunner, startTime, config, "monitoring");
+			let session: PtyTerminalSession | undefined;
+			try {
+				session = new PtyTerminalSession(
+					{ command: monitorCommand, cwd: effectiveCwd, cols: 120, rows: 40, scrollback: config.scrollbackLines },
+				);
+				const startTime = Date.now();
+				sessionManager.add(sessionCommand, session, name, effectiveReason, { id, noAutoCleanup: true, startedAt: new Date(startTime) });
+				coordinator.registerMonitorSession(id, compiled.publicConfig, new Date(startTime));
+				const monitorRunner = new HeadlessDispatchMonitor(session, config, {
+					autoExitOnQuiet: handsFree?.autoExitOnQuiet === true,
+					quietThreshold: handsFree?.quietThreshold ?? config.handsFreeQuietThreshold,
+					gracePeriod: handsFree?.gracePeriod ?? config.autoExitGracePeriod,
+					timeout,
+					startedAt: startTime,
+					monitor: compiled.runtime,
+					onMonitorEvent: makeMonitorEventCallback(pi, id, compiled, effectiveCwd),
+				}, makeStructuredMonitorCompletionCallback(pi, id));
+				registerHeadlessActive(id, sessionCommand, effectiveReason, session, monitorRunner, startTime, config, "monitoring");
+			} catch (error) {
+				failHeadlessStart(id, session, error, spawnWorktreePath);
+			}
 
 			return {
 				content: [{ type: "text", text: appendWorktreeNotice(`Monitor started in background (id: ${id}).\nStrategy: ${compiled.publicConfig.strategy ?? "stream"}\nTriggers: ${compiled.publicConfig.triggers.map((trigger) => trigger.id).join(", ")}\nYou'll be notified when a trigger emits an event.`, spawnWorktreePath) }],
@@ -899,21 +898,24 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 
 		if (effectiveMode === "dispatch" && background) {
 			const id = generateSessionId(name);
-			const session = new PtyTerminalSession(
-				{ command: launchCommand, cwd: effectiveCwd, cols: 120, rows: 40, scrollback: config.scrollbackLines },
-			);
-
-			const startTime = Date.now();
-			sessionManager.add(launchCommand, session, name, effectiveReason, { id, noAutoCleanup: true, startedAt: new Date(startTime) });
-
-			const monitor = new HeadlessDispatchMonitor(session, config, {
-				autoExitOnQuiet: handsFree?.autoExitOnQuiet !== false,
-				quietThreshold: handsFree?.quietThreshold ?? config.handsFreeQuietThreshold,
-				gracePeriod: handsFree?.gracePeriod ?? config.autoExitGracePeriod,
-				timeout,
-				startedAt: startTime,
-			}, makeMonitorCompletionCallback(pi, id, startTime));
-			registerHeadlessActive(id, launchCommand, effectiveReason, session, monitor, startTime, config);
+			let session: PtyTerminalSession | undefined;
+			try {
+				session = new PtyTerminalSession(
+					{ command: launchCommand, cwd: effectiveCwd, cols: 120, rows: 40, scrollback: config.scrollbackLines },
+				);
+				const startTime = Date.now();
+				sessionManager.add(launchCommand, session, name, effectiveReason, { id, noAutoCleanup: true, startedAt: new Date(startTime) });
+				const monitor = new HeadlessDispatchMonitor(session, config, {
+					autoExitOnQuiet: handsFree?.autoExitOnQuiet !== false,
+					quietThreshold: handsFree?.quietThreshold ?? config.handsFreeQuietThreshold,
+					gracePeriod: handsFree?.gracePeriod ?? config.autoExitGracePeriod,
+					timeout,
+					startedAt: startTime,
+				}, makeMonitorCompletionCallback(pi, id, startTime));
+				registerHeadlessActive(id, launchCommand, effectiveReason, session, monitor, startTime, config);
+			} catch (error) {
+				failHeadlessStart(id, session, error, spawnWorktreePath);
+			}
 
 			return {
 				content: [{ type: "text", text: appendWorktreeNotice(`Session dispatched in background (id: ${id}).\nYou'll be notified when it completes. User can /attach ${id} to watch.`, spawnWorktreePath) }],
@@ -984,12 +986,12 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 
 			if (effectiveMode === "dispatch") {
 				return {
-					content: [{ type: "text", text: appendWorktreeNotice(`Session dispatched (id: ${generatedSessionId}).\nYou'll be notified when it completes.\nYou can still query with interactive_shell({ sessionId: "${generatedSessionId}" }) if needed.`, spawnWorktreePath) }],
+					content: [{ type: "text", text: appendWorktreeNotice(`Session dispatched (id: ${generatedSessionId}).\nYou'll be notified when it completes.\nYou can still query with interactive_shell({ action: "query", sessionId: "${generatedSessionId}" }) if needed.`, spawnWorktreePath) }],
 					details: { sessionId: generatedSessionId, status: "running", command: launchCommand, reason: effectiveReason, mode: effectiveMode, spawnAgent, spawnMode, spawnWorktreePath },
 				};
 			}
 			return {
-				content: [{ type: "text", text: appendWorktreeNotice(`Interactive session started: ${generatedSessionId}\nCommand: ${launchCommand}\n\nUse interactive_shell({ sessionId: "${generatedSessionId}", input: "...", submit: true }) to send input.\nUse interactive_shell({ sessionId: "${generatedSessionId}" }) to check status/output.\nUse interactive_shell({ sessionId: "${generatedSessionId}", kill: true }) to end when done.`, spawnWorktreePath) }],
+				content: [{ type: "text", text: appendWorktreeNotice(`Interactive session started: ${generatedSessionId}\nCommand: ${launchCommand}\n\nUse interactive_shell({ action: "send", sessionId: "${generatedSessionId}", input: "...", submit: true }) to send input.\nUse interactive_shell({ action: "query", sessionId: "${generatedSessionId}" }) to check status/output.\nUse interactive_shell({ action: "kill", sessionId: "${generatedSessionId}" }) to end when done.`, spawnWorktreePath) }],
 				details: { sessionId: generatedSessionId, status: "running", command: launchCommand, reason: effectiveReason, mode: effectiveMode, spawnAgent, spawnMode, spawnWorktreePath },
 			};
 		}
@@ -1136,6 +1138,11 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 		sessionManager.killAll();
 		coordinator.disposeAllMonitors();
 	});
+	pi.on("before_provider_request", (event, ctx) => {
+		const compat = ctx.model?.compat;
+		const payload = explicitResponsesStrictness(event.payload, ctx.model?.api, compat && "supportsStrictMode" in compat ? compat.supportsStrictMode : undefined);
+		return payload === event.payload ? undefined : payload;
+	});
 
 	pi.registerTool({
 		name: TOOL_NAME,
@@ -1145,14 +1152,19 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 			? {}
 			: {
 				promptSnippet:
-					"Choose at most one session lifecycle selector: command, non-empty spawn, sessionId, or attach. Do not combine command or spawn with sessionId or attach. mode='monitor' with monitor starts a monitor; file-watch monitors may omit command, and monitorStatus/monitorEvents use monitorSessionId or sessionId. For an existing session, omit command and spawn; use submit=true when sending slash commands. An error means the operation was not performed, so do not claim success or repeat the unchanged invalid call; rebuild it from the matching minimal example.",
+					"Choose one explicit action. start launches a CLI or monitor; query only reads an existing session; send writes input (use submit=true for Enter); kill stops it. Omit unused fields, or use null under strict sampling. Never use empty-string/zero/false placeholders. Validation errors perform no operation; do not retry unchanged arguments.",
 			}),
 		parameters: toolParameters,
+		constrainedSampling: { type: "json_schema", strict: "prefer" },
+		// Pi validates this prepared shape against parameters before execution.
+		prepareArguments: (args) => prepareToolArguments(args) as ToolParams,
 
 		async execute(_toolCallId, params, _signal, onUpdate, ctx) {
-			const result = await runTool(params, onUpdate, ctx);
+			_signal?.throwIfAborted();
+			const result = await runTool(parseToolRequest(params), onUpdate, ctx);
+			if (result.isError) throw new Error(result.content.map((item) => item.text).join("\n"));
 			// AgentToolResult requires `details`; normalize the paths that produce none.
-			return { content: result.content, details: result.details ?? {}, isError: result.isError };
+			return { content: result.content, details: result.details ?? {} };
 		},
 	});
 
@@ -1192,10 +1204,10 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 		ctx: ExtensionContext,
 	): Promise<{ content: Array<{ type: "text"; text: string }>; details?: unknown; isError?: boolean }> {
 			const {
+				action,
 				command,
 				spawn,
 				sessionId,
-				kill,
 				outputLines,
 				outputMaxChars,
 				outputOffset,
@@ -1212,12 +1224,6 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 				reason,
 				mode,
 				background,
-				attach,
-				listBackground,
-				dismissBackground,
-				monitorEvents,
-				monitorStatus,
-				monitorSessionId,
 				monitorEventLimit,
 				monitorEventOffset,
 				monitorSinceEventId,
@@ -1229,50 +1235,18 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 				monitor,
 			} = params;
 
-			const hasStructuredInput = inputKeys?.length || inputHex?.length || inputPaste;
+			const hasStructuredInput = inputKeys !== undefined || inputHex !== undefined || inputPaste !== undefined;
 			const effectiveInput = hasStructuredInput
 				? { text: input, keys: inputKeys, hex: inputHex, paste: inputPaste }
 				: input;
-			const normalizedSpawn = normalizeSpawnRequest(spawn);
-			const hasNonStartOperation = Boolean(
-				sessionId || attach || listBackground || dismissBackground || monitorEvents || monitorStatus,
-			);
-			const isCommandlessFileWatchMonitor = mode === "monitor" && monitor?.strategy === "file-watch";
-			const spawnForAction = (command || hasNonStartOperation || isCommandlessFileWatchMonitor) && isEmptySpawnPlaceholder(spawn)
-				? undefined
-				: normalizedSpawn;
+			const attach = action === "attach" ? sessionId : undefined;
+			const dismissBackground = action === "dismiss" ? sessionId ?? true : false;
 
-			if (spawnForAction && command) {
-				return {
-					content: [{ type: "text", text: "Use either 'command' or 'spawn', not both." }],
-					isError: true,
-				};
-			}
-			if ((command && (sessionId || attach)) || (sessionId && attach)) {
-				return {
-					content: [{ type: "text", text: "Use exactly one session selector: command or spawn to start a session, sessionId for an existing session, or attach to reattach a background session." }],
-					isError: true,
-				};
-			}
-			if (spawnForAction && (sessionId || attach || listBackground || dismissBackground || monitorEvents || monitorStatus)) {
-				return {
-					content: [{ type: "text", text: "'spawn' starts a new session only. Omit it for existing or background-session operations; for example, use { sessionId: \"...\", input: \"/compact\", submit: true } or { sessionId: \"...\", kill: true }." }],
-					isError: true,
-				};
-			}
-
-			if ((params as { monitorFilter?: unknown }).monitorFilter !== undefined) {
-				return {
-					content: [{ type: "text", text: "monitorFilter was removed. Use mode='monitor' with a structured monitor object." }],
-					isError: true,
-				};
-			}
-
-			if (monitorStatus) {
-				const targetMonitorSessionId = monitorSessionId ?? sessionId;
+			if (action === "monitor_status") {
+				const targetMonitorSessionId = sessionId;
 				if (!targetMonitorSessionId) {
 					return {
-						content: [{ type: "text", text: "monitorStatus requires monitorSessionId (or sessionId)." }],
+						content: [{ type: "text", text: "monitor_status requires sessionId." }],
 						isError: true,
 					};
 				}
@@ -1302,11 +1276,11 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 				};
 			}
 
-			if (monitorEvents) {
-				const targetMonitorSessionId = monitorSessionId ?? sessionId;
+			if (action === "monitor_events") {
+				const targetMonitorSessionId = sessionId;
 				if (!targetMonitorSessionId) {
 					return {
-						content: [{ type: "text", text: "monitorEvents requires monitorSessionId (or sessionId)." }],
+						content: [{ type: "text", text: "monitor_events requires sessionId." }],
 						isError: true,
 					};
 				}
@@ -1356,7 +1330,7 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 			}
 
 			// ── Branch 1: Interact with existing session ──
-			if (sessionId) {
+			if (sessionId && ["query", "send", "configure", "kill", "background"].includes(action)) {
 				const session = sessionManager.getActive(sessionId);
 				if (!session) {
 					return {
@@ -1367,7 +1341,7 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 				}
 
 				// Kill
-				if (kill) {
+				if (action === "kill") {
 					const alreadyCompleted = Boolean(session.getResult());
 					if (!alreadyCompleted) {
 						coordinator.markAgentHandledCompletion(sessionId);
@@ -1387,7 +1361,7 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 				}
 
 				// Background
-				if (background) {
+				if (action === "background") {
 					if (session.getResult()) {
 						return {
 							content: [{ type: "text", text: "Session already completed." }],
@@ -1415,19 +1389,29 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 				}
 
 				const actions: string[] = [];
+				if (action === "configure" && (
+					(settings?.updateInterval !== undefined && !session.setUpdateInterval)
+					|| (settings?.quietThreshold !== undefined && !session.setQuietThreshold)
+				)) {
+					return { content: [{ type: "text", text: "Session does not support the requested configuration; no settings were changed." }], isError: true };
+				}
 
 				if (settings?.updateInterval !== undefined) {
 					if (sessionManager.setActiveUpdateInterval(sessionId, settings.updateInterval)) {
 						actions.push(`update interval set to ${settings.updateInterval}ms`);
+					} else {
+						return { content: [{ type: "text", text: "Session configuration update failed." }], isError: true };
 					}
 				}
 				if (settings?.quietThreshold !== undefined) {
 					if (sessionManager.setActiveQuietThreshold(sessionId, settings.quietThreshold)) {
 						actions.push(`quiet threshold set to ${settings.quietThreshold}ms`);
+					} else {
+						return { content: [{ type: "text", text: `Session configuration update failed.${actions.length ? ` Applied: ${actions.join(", ")}.` : ""}` }], isError: true };
 					}
 				}
 
-				if (effectiveInput !== undefined || submit) {
+				if (action === "send") {
 					const translatedInput = effectiveInput !== undefined ? translateInput(effectiveInput) : "";
 					const finalInput = submit ? `${translatedInput}\r` : translatedInput;
 					const success = sessionManager.writeToActive(sessionId, finalInput);
@@ -1446,7 +1430,7 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 					}
 				}
 
-				if (actions.length === 0) {
+				if (action === "query") {
 					const status = session.getStatus();
 					const runtime = session.getRuntime();
 					const result = session.getResult();
@@ -1642,7 +1626,7 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 					return {
 						content: [{ type: "text", text: mode === "dispatch"
 							? `Reattached to ${reattachSessionId}. You'll be notified when it completes.`
-							: `Reattached to ${reattachSessionId}.\nUse interactive_shell({ sessionId: "${reattachSessionId}" }) to check status/output.` }],
+							: `Reattached to ${reattachSessionId}.\nUse interactive_shell({ action: "query", sessionId: "${reattachSessionId}" }) to check status/output.` }],
 						details: { sessionId: reattachSessionId, status: "running", command: bgSession.command, reason: bgSession.reason, mode },
 					};
 				}
@@ -1677,7 +1661,7 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 			}
 
 			// ── Branch 3: List background sessions ──
-			if (listBackground) {
+			if (action === "list") {
 				const sessions = sessionManager.list();
 				if (sessions.length === 0) {
 					return { content: [{ type: "text", text: "No background sessions." }] };
@@ -1725,16 +1709,10 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 			}
 
 			// ── Branch 4: Start new session ──
-			if (!command && !spawnForAction && !isCommandlessFileWatchMonitor) {
-				return {
-					content: [{ type: "text", text: "One of 'command', 'spawn', 'sessionId', 'attach', 'listBackground', or 'dismissBackground' is required." }],
-					isError: true,
-				};
-			}
 			return startNewSession({
 				ctx,
 				command,
-				spawn: spawnForAction,
+				spawn,
 				cwd,
 				name,
 				reason,

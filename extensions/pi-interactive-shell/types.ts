@@ -1,6 +1,7 @@
 /**
  * Shared types and interfaces for the interactive shell extension.
  */
+import type { ToolParams } from "./tool-schema.ts";
 
 export interface InteractiveShellResult {
 	exitCode: number | null;
@@ -52,46 +53,10 @@ export type MonitorStrategy = "stream" | "poll-diff" | "file-watch";
 
 export type MonitorThresholdOperator = "lt" | "lte" | "gt" | "gte";
 
-export interface MonitorThresholdConfig {
-	captureGroup: number;
-	op: MonitorThresholdOperator;
-	value: number;
-}
-
-export interface MonitorTriggerConfig {
-	id: string;
-	literal?: string;
-	regex?: string;
-	cooldownMs?: number;
-	threshold?: MonitorThresholdConfig;
-}
-
-export interface MonitorFileWatchConfig {
-	path: string;
-	recursive?: boolean;
-	events?: Array<"rename" | "change">;
-}
-
-export interface MonitorConfig {
-	strategy?: MonitorStrategy;
-	triggers: MonitorTriggerConfig[];
-	fileWatch?: MonitorFileWatchConfig;
-	poll?: {
-		intervalMs?: number;
-	};
-	persistence?: {
-		stopAfterFirstEvent?: boolean;
-		maxEvents?: number;
-	};
-	throttle?: {
-		dedupeExactLine?: boolean;
-		cooldownMs?: number;
-	};
-	detector?: {
-		detectorCommand: string;
-		timeoutMs?: number;
-	};
-}
+export type MonitorConfig = NonNullable<ToolParams["monitor"]>;
+export type MonitorTriggerConfig = MonitorConfig["triggers"][number];
+export type MonitorThresholdConfig = NonNullable<MonitorTriggerConfig["threshold"]>;
+export type MonitorFileWatchConfig = NonNullable<MonitorConfig["fileWatch"]>;
 
 export interface MonitorEventPayload {
 	sessionId: string;
