@@ -16,6 +16,13 @@ describe("interactive_shell public contract", () => {
 		expect(parseToolRequest({ action: "send", sessionId: "shell-1", input: "", submit: false })).toEqual({ action: "send", sessionId: "shell-1", input: "", submit: false });
 	});
 
+	it("ignores empty spawn placeholders on calls that do not start a session", () => {
+		const placeholder = { agent: "", mode: "fresh", worktree: false, prompt: "" };
+		expect(parseToolRequest({ action: "query", sessionId: "shell-1", spawn: placeholder })).toEqual({ action: "query", sessionId: "shell-1" });
+		expect(() => parseToolRequest({ action: "start", command: "echo hi", spawn: placeholder })).toThrow();
+		expect(parseToolRequest({ action: "start", spawn: { agent: "pi", prompt: "fix" } })).toEqual({ action: "start", spawn: { agent: "pi", prompt: "fix" } });
+	});
+
 	it("migrates unambiguous legacy selectors and matchers without mutating history", () => {
 		const legacy = { command: "echo READY", mode: "monitor", monitor: { triggers: [{ id: "ready", literal: "READY", regex: "" }] } };
 		expect(prepareToolArguments(legacy)).toEqual({ action: "start", command: "echo READY", mode: "monitor", monitor: { triggers: [{ id: "ready", kind: "literal", pattern: "READY" }] } });

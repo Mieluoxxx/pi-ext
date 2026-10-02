@@ -29,7 +29,14 @@ export function prepareToolArguments(raw: unknown): unknown {
 		}
 		if (args.spawn.worktree != null && typeof args.spawn.worktree !== "boolean") invalid("spawn.worktree must be boolean.");
 	}
-	if (args.action !== undefined) return args;
+	if (args.action !== undefined) {
+		// Hosts and strict-schema round trips can inject an empty spawn placeholder
+		// into calls that never start a session; never let it block those actions.
+		if (args.action !== "start" && record(args.spawn) && isEmptySpawnPlaceholder(args.spawn)) {
+			delete args.spawn;
+		}
+		return args;
+	}
 	for (const key of ["command", "sessionId", "attach", "monitorSessionId"]) {
 		if (args[key] === "" || args[key] === null) delete args[key];
 	}
