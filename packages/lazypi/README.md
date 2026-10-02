@@ -68,7 +68,7 @@ Model configuration ships through the optional `models` preset: the provider cat
 ### Replicate this environment on a new machine
 
 ```bash
-npx @moguw/lazypi install --preset base --preset ui --preset workflow --preset models --yes
+npx @moguw/lazypi install --preset all --yes
 export CPA_API_KEY=<the local proxy key>   # same value as the maintainer's models.json apiKey
 ```
 
@@ -122,7 +122,7 @@ node bin/lazypi.mjs install --preset base --preset ui \
   --preset ~/.config/lazypi/laptop/preset.json --dry-run
 ```
 
-Presets apply left to right over existing configuration. Later presets override matching fields; unrelated fields remain. Use the same combination with `status` to check drift. Plans show target paths and field origins, not values. An external preset is loaded only when explicitly named; no implicit project/HOME scan or remote download occurs.
+Presets apply left to right over existing configuration. Later presets override matching fields; unrelated fields remain. Use the same combination with `status` to check drift. Plans show target paths and field origins, not values. An external preset is loaded only when explicitly named; no implicit project/HOME scan or remote download occurs. `--preset all` is shorthand for every built-in preset (currently base, models, ui, workflow, applied alphabetically).
 
 - `merge`: recursive JSON-object merge; arrays replace as a whole; `null` is a value, not deletion. Content-equal arrays do not cause repeated writes.
 - `merge-models`: only for `agent/models.json`; providers merge by name and models by exact `id`, retaining unrelated providers, models and fields. Existing order is preserved and new ids append in preset order. Duplicate ids within one provider input, invalid collection shapes, and null provider/model collections fail preflight. Empty model arrays do not delete models.

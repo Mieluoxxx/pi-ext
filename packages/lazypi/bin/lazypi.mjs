@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { basename, dirname, join, posix, resolve, win32 } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -293,7 +293,7 @@ ${bold("Commands:")}
   doctor    Check the Pi extension environment
 
 ${bold("Install options:")}
-  --preset <name|file> Apply a built-in or external preset (repeatable; global only)
+  --preset <name|file> Apply a built-in or external preset (repeatable; global only; "all" = every built-in preset)
   --dry-run           Preview a preset installation without any writes or installs
   --only <list>       Install only the given categories or extension ids
   --except <list>     Install everything except the given categories or ids
@@ -306,7 +306,7 @@ ${bold("Install options:")}
 ${bold("Default behaviour:")}
   - Every catalog extension is installed by default.
   - With --preset, only preset requirements and additional --only selections are installed.
-  - Built-in presets: base, ui, workflow, models. Later presets override earlier preferences.
+  - Built-in presets: base, ui, workflow, models. "--preset all" applies every built-in preset; later presets override earlier preferences.
   - Presets cannot be combined with --local or --force; status --preset checks drift.
   - On a TTY, choose everything or review packages one by one with recommendation reasons.
   - With --yes, --force, --only, or --except interactive selection is skipped.
@@ -824,7 +824,10 @@ async function cmdPresets(flags) {
 	if (flags.local || flags.force) throw new Error("--preset cannot be combined with --local or --force");
 	if (flags.dryRun && flags.command !== "install") throw new Error("--dry-run is supported by install only");
 	if (flags.only && flags.except) throw new Error("Preset selection cannot combine --only and --except");
-	const presets = loadPresets(flags.presets, { builtinDir: repoFilePath("presets"), catalog: PACKAGES, home: homedir() });
+	const requestedPresets = flags.presets.flatMap((ref) => ref === "all"
+		? readdirSync(repoFilePath("presets"), { withFileTypes: true }).filter((entry) => entry.isDirectory() && entry.name !== "all").map((entry) => entry.name).sort()
+		: [ref]);
+	const presets = loadPresets(requestedPresets, { builtinDir: repoFilePath("presets"), catalog: PACKAGES, home: homedir() });
 	const required = new Set(presets.flatMap((preset) => preset.packages));
 	const selectedIds = expandPackageDependencies(new Set([...required, ...(flags.only ? resolveSelection(flags) : [])]));
 	if (flags.except) {

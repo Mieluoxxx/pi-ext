@@ -306,6 +306,22 @@ test("local package duplicates block both preview and installation", (t) => {
 	assert.deepEqual(backups(state), []);
 });
 
+test("--preset all expands to the full built-in preset set", (t) => {
+	const state = workspace(t);
+	success(run(state, ["--preset", "all", "--yes"]));
+	const settings = json(join(state.agentDir, "settings.json"));
+	assert.equal(settings.defaultThinkingLevel, "xhigh");
+	assert.deepEqual(settings.defaultTools, ["+codemode", "+tool_search"]);
+	assert.equal(settings.theme, "system");
+	assert.equal(settings.workspaceHistory.enabled, true);
+	assert.equal(settings.defaultProvider, "cpa-openai-responses");
+	assert.equal(settings.defaultModel, "deepseek-flash");
+	assert.ok(Object.keys(json(join(state.agentDir, "models.json")).providers).length > 0);
+	assert.equal(existsSync(join(state.agentDir, "mcp.json")), true);
+	assert.equal(existsSync(join(state.agentDir, "zentui.json")), true);
+	assert.equal(readFileSync(join(state.agentDir, "AGENTS.md"), "utf8"), readFileSync("agent/AGENTS.md", "utf8"));
+});
+
 test("models preset ships placeholder keys and replicates provider defaults", (t) => {
 	const state = workspace(t);
 	const shipped = json("presets/models/providers.json");
