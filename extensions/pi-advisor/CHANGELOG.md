@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 — 2026-10-03
 
 - Cap each consultation's wall-clock time with `budget.timeoutSec` (default 420s;
   time spent on a budget confirmation does not count). Across 1658 recorded

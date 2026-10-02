@@ -1,6 +1,6 @@
 {
   "name": "@moguw/pi-advisor",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Pi extension. A second opinion the model can request from a stronger reviewer model before it acts.",
   "keywords": [
     "pi-package",
