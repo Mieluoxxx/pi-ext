@@ -29,7 +29,7 @@ Then run Pi and use `/stats`.
 ## Included metrics
 
 - Input, output, reasoning, cache read/write, total tokens, recorded cost, requests, and errors
-- Daily activity (hourly for the Today range) and breakdowns by model, provider, project, agent, and tool
+- Activity chart: hourly bars for Today, daily bars for 7-day, GitHub-style heatmap for 30 days (row) and Lifetime (week-columns calendar); breakdowns by model, provider, project, agent, and tool
 - Local-only behavior counters for user messages: yelling, profanity, anguish, correction, repetition, and blame
 - Error breakdown by type: aborts, timeouts, HTTP status codes, context overflow, stream interruptions
 
