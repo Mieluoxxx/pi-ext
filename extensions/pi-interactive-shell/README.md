@@ -201,11 +201,41 @@ Global and project configuration files are merged, with project values taking pr
 
 Set `defer` to `true` to initially expose only `enable_interactive_shell`. Calling that loader activates `interactive_shell` for the current session; reload or session replacement resets availability. See [`skills/pi-interactive-shell/SKILL.md`](./skills/pi-interactive-shell/SKILL.md) for the concise agent workflow.
 
+### Launch policy (global only)
+
+`launchPolicy` gates commands launched through `interactive_shell` and `/spawn` by exact string match. Rules are `allow`, `ask`, or `deny`; when several match, deny wins over ask, which wins over allow; unmatched commands ask. `deny` blocks before any PTY, session, or worktree is created; `ask` shows a Pi confirmation dialog. Define it only in the global config — a project config that sets it is rejected:
+
+```json
+{
+  "launchPolicy": [
+    { "command": "npm test", "decision": "allow" },
+    { "command": "rm -rf /", "decision": "deny" }
+  ]
+}
+```
+
+Omitting the field keeps launches unchanged.
+
 ## Limitations
 
-- macOS is tested; Linux support is experimental.
+- macOS is tested; Linux support is experimental (the upstream Linux PTY completion rework is not ported; see Upstream sync).
 - Existing-session queries are rate-limited by default.
 - Terminal applications may have rendering quirks in an overlay.
+
+## Upstream sync
+
+Ported from [nicobailon/pi-interactive-shell](https://github.com/nicobailon/pi-interactive-shell) `77df9a8` (v0.17.0; fork point `87938ca`, v0.15.0):
+
+- Force PTY cleanup (`b5adeed`), empty spawn placeholder tolerance (#44).
+- Shell resolution through Pi's Bash selection and `shellPath` (`3390524`), with literal quoting for generated commands.
+- Stale background-widget cleanup (`6be4554`), agent control on Ctrl+B (`584452f`).
+- Machine-readable `completionReason` (`1342ccf`) and five-minute completed dispatch output (`9a01bde`).
+- Global `launchPolicy` (`846b02b` + `1fc6388`).
+- `/reload` survival for background sessions and monitors (`62c047a` + prototype re-attach from `1b7a029`) and the compact background widget.
+
+Deliberately not ported: Jev semantic supervision and recoverable output selection (external API, credentials, ~2000 lines; revisit if semantic monitoring is needed), and the Linux PTY completion rework (`981ca32`, 500 lines of Linux-specific plumbing) until Linux tail-output loss is actually observed.
+
+The action-based tool contract (`action: "start" | "query" | ...`) is a fork-local redesign; upstream still uses flat parameters, so future upstream tool-schema changes must be merged by hand into `tool-schema.ts` and `tool-contract.ts`.
 
 ## Acknowledgments
 

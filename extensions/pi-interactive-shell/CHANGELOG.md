@@ -4,6 +4,27 @@ All notable changes to the `pi-interactive-shell` extension will be documented i
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-10-02
+
+Synced upstream [pi-interactive-shell](https://github.com/nicobailon/pi-interactive-shell) `77df9a8` (v0.17.0) onto the action-based contract. Reference waterline for the next sync; per-commit details live in the README's Upstream sync section.
+
+### Added
+- Add a global-only `launchPolicy` that allows, asks for, or denies exact commands launched through `interactive_shell` and `/spawn`. `deny` blocks before any PTY, session, or worktree is created; unmatched commands ask; project config cannot define or weaken the policy (`846b02b` + `1fc6388`).
+- Keep background sessions and monitors alive across `/reload`; notifications route through the rebound ExtensionAPI, and `/clear`-replacement keeps the widget stable (`62c047a` + prototype re-attach from `1b7a029`).
+- Resolve shells through Pi's Bash selection and `shellPath` for new sessions, monitor detector commands, and generated spawn/monitor commands on every platform (`3390524`).
+
+### Changed
+- The background widget shows only running sessions, caps its height on short terminals, and collapses overflow into a summary.
+- Dispatch quiet auto-close now reports a machine-readable `completionReason` and is marked as a non-terminal command verdict (`1342ccf`).
+- Completed dispatch and query output stays queryable for the documented five-minute window, and retained sessions are disposed on scheduled cleanup (`9a01bde`).
+
+### Fixed
+- Force an unresponsive PTY kill up to SIGKILL after 250 ms and dispose killed sessions; ignore schema-generated empty spawn placeholders on calls that do not start a session (`b5adeed`).
+- Stop reusing an expired session context during stale background-widget cleanup (`6be4554`).
+- Keep hands-free sessions under agent control when Ctrl+B moves them to the background (`584452f`).
+- Windows no longer falls back to `cmd.exe`, and macOS/Linux no longer inherit `$SHELL`; generated arguments keep `$`, backticks, and quotes literal.
+
+## [0.15.1] - 2026-09-07
 ### Changed
 - Require explicit tool actions and single-pattern `literal`/`regex`/`numeric` triggers. Migrate only unambiguous legacy calls before schema validation.
 - Require Pi/pi-ai 0.86.0+, prefer native strict sampling, and explicitly set non-strict Responses fallback only for this tool when supported.
