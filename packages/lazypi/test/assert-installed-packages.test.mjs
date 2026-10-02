@@ -28,7 +28,7 @@ test("catalog matches the normalized sixteen-extension pi list snapshot", () => 
 	];
 	assert.deepEqual(expectedPackageSources().sort(), expected.sort());
 	assert.equal(PACKAGES.find((pkg) => pkg.id === "advisor").source, "npm:@moguw/pi-advisor");
-	assert.deepEqual(PACKAGES.filter((pkg) => !pkg.source).map((pkg) => pkg.id), ["vesper-dark", "vesper-light", "global-agents", "advisor-watchdog", "vision-config"]);
+	assert.deepEqual(PACKAGES.filter((pkg) => !pkg.source).map((pkg) => pkg.id), ["vesper-dark", "vesper-light", "global-agents", "vision-config"]);
 });
 
 test("expectedPackageSources supports excluded package ids", () => {

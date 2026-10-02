@@ -1,4 +1,0 @@
-main: true
-advisors:
-  - name: default
-    model: cpa-openai-responses/gpt-6-astra:high

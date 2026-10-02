@@ -24,7 +24,7 @@ import {
 // Customize this array; it is the only extension catalog used by the CLI.
 export const PACKAGES = [
 	// core
-	{ id: "advisor", category: "core", source: "npm:@moguw/pi-advisor", description: "实时会话顾问", hint: "独立 advisor 咨询：稳定缓存前缀、费用预算与超时、按收益保活；WATCHDOG.yml 由 advisor-watchdog 配置条目安装，默认随主会话观察会产生额外调用。", conflicts: ["npm:@juicesharp/rpiv-advisor", "npm:pi-omp-advisor"] },
+	{ id: "advisor", category: "core", source: "npm:@moguw/pi-advisor", description: "实时会话顾问", hint: "主模型在动笔前、卡住或宣布完成前自主调用零参数 advisor()；稳定缓存前缀、费用预算与超时、按收益保活；同模型直接禁用。模型选择存于 ~/.config/rpiv-advisor/advisor.json，不在 agent 目录内。", conflicts: ["npm:@juicesharp/rpiv-advisor", "npm:pi-omp-advisor"] },
 	{ id: "workspace-history", category: "core", source: "npm:pi-workspace-history", description: "工作区回溯", hint: "回滚的不只是聊天记录——导航历史时同步恢复工作区文件，支持 /undo、/redo 与 /tree。" },
 	{ id: "goal", category: "core", source: "npm:@narumitw/pi-goal", description: "长期目标模式", hint: "用 /goal 设定目标，Pi 跨回合自主推进直至完成，支持暂停、恢复与队列。" },
 	{ id: "vision", category: "core", source: "npm:@getpipher/vision", description: "视觉能力", hint: "按主模型能力自动路由：多模态直读图片，纯文本模型才委托视觉模型分析；vision-config 配置条目定制路由与缓存。" },
@@ -49,7 +49,6 @@ export const PACKAGES = [
 	{ id: "vesper-light", category: "themes", themeFiles: ["themes/vesper-light.json"], description: "Vesper 亮色主题", hint: "暖米色底的亮色变体，桃色强调、薄荷点缀；将 settings.theme 设为 \"vesper-light\" 启用。" },
 	// config
 	{ id: "global-agents", category: "config", agentFiles: ["agent/AGENTS.md"], description: "全局 AGENTS.md", hint: "安装全局 agent 配置文件到 ~/.pi/agent/AGENTS.md，覆盖前自动备份。" },
-	{ id: "advisor-watchdog", category: "config", agentFiles: ["agent/WATCHDOG.yml"], description: "Advisor 观察者配置", hint: "安装 WATCHDOG.yml 到 agent 根目录，定制 advisor 的观察者与模型（引用 models.json 里的 provider）；覆盖前自动备份。" },
 	{ id: "vision-config", category: "config", agentFiles: ["agent/vision.json"], description: "Vision 配置", hint: "安装 vision.json 到 agent 根目录，定制视觉路由、缓存与重试行为；覆盖前自动备份。" },
 ];
 const CATEGORIES = [...new Set(PACKAGES.map((pkg) => pkg.category))];

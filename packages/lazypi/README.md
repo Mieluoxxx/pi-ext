@@ -37,7 +37,7 @@ npx @moguw/lazypi --local                  # install into .pi/settings.json of t
 
 ### Portable package sources
 
-The extension set follows a 16-extension `pi list` snapshot, normalizing nine local [pi-ext](https://github.com/Mieluoxxx/pi-ext) checkouts to their `@moguw` npm package sources. Five existing file entries (AGENTS, the two Vesper themes, `WATCHDOG.yml` and `vision.json`) remain separate from that extension list. npm sources remain unpinned; package-name parity is not a guarantee of byte-for-byte version parity. Publish new package versions before releasing a LazyPi catalog that requires them.
+The extension set follows a 16-extension `pi list` snapshot, normalizing nine local [pi-ext](https://github.com/Mieluoxxx/pi-ext) checkouts to their `@moguw` npm package sources. Four existing file entries (AGENTS, the two Vesper themes and `vision.json`) remain separate from that extension list. npm sources remain unpinned; package-name parity is not a guarantee of byte-for-byte version parity. Publish new package versions before releasing a LazyPi catalog that requires them.
 
 | Catalog id | Category | Pi install source |
 | --- | --- | --- |
@@ -61,7 +61,7 @@ Catalog updates do **not** migrate existing local-path registrations or uninstal
 - **[OpenAI tools](https://github.com/Mieluoxxx/pi-ext/tree/main/extensions/pi-openai-tools)** combines context management, remote compaction, Astra compatibility and `apply_patch`. Image generation is disabled by default. Remove or disable standalone `pi-apply-patch` before loading this package; gateway/model support still needs separate verification. Per-package resource filters (the object form in `settings.json` `packages`) are applied by Pi itself and stay out of scope for LazyPi.
 - **[Token speed](https://www.npmjs.com/package/pi-token-speed)** renders live generation speed; the `ui` preset places it in the zentui footer and turns on its visibility.
 - **[Stats dashboard](https://github.com/Mieluoxxx/pi-ext/tree/main/extensions/pi-stats-dashboard)** aggregates local `/stats` usage: lifetime/today/7d/30d tokens, costs and model/project/tool distributions from persisted session JSONL.
-- **[pi-advisor](https://github.com/Mieluoxxx/pi-ext/tree/main/extensions/pi-advisor)** runs independent advisor consultations with stable cache prefixes, budget metering, timeouts and opt-in completion review; it is derived from `rpiv-mono`'s rpiv-advisor. The `advisor-watchdog` config entry installs `WATCHDOG.yml`, which references providers from the device-managed `models.json`.
+- **[pi-advisor](https://github.com/Mieluoxxx/pi-ext/tree/main/extensions/pi-advisor)** runs independent advisor consultations with stable cache prefixes, budget metering, timeouts and opt-in completion review; it is derived from `rpiv-mono`'s rpiv-advisor. Its model selection lives in `~/.config/rpiv-advisor/advisor.json`, outside the agent directory — copy that file manually when replicating; `WATCHDOG.yml` belongs to the retired pi-omp-advisor and is not part of this catalog.
 
 Model configuration ships through the optional `models` preset: the provider catalog is sanitized so every `apiKey` is the `$CPA_API_KEY` environment reference, never a literal credential. `auth.json`, project trust and sessions are never copied; on the maintainer's machine `auth.json` is empty and authentication goes through the local proxy key.
 
@@ -72,7 +72,7 @@ npx @moguw/lazypi install --preset all --yes
 export CPA_API_KEY=<the local proxy key>   # same value as the maintainer's models.json apiKey
 ```
 
-Boundaries the presets do not cover: the CPA proxy itself must run on `localhost:8317` — it is not shipped. The `cua` MCP entry is stored in portable form (`~/.local/bin/cua-driver`, `${HOME}/.cua-driver/policy.yaml`) and degrades gracefully when the driver is absent. Sessions, project trust and credentials stay device-local.
+Boundaries the presets do not cover: the CPA proxy itself must run on `localhost:8317` — it is not shipped. The `cua` MCP entry is stored in portable form (`~/.local/bin/cua-driver`, `${HOME}/.cua-driver/policy.yaml`) and degrades gracefully when the driver is absent. pi-advisor's model selection lives in `~/.config/rpiv-advisor/advisor.json`, outside the agent directory: copy it manually (the file contains no credentials) or run `/advisor` once on the new machine — without it, `advisor()` reports "No advisor model is configured" instead of consulting. Sessions, project trust and credentials stay device-local.
 
 `web-access` is no longer part of this catalog. The dedicated `web-search` preset target remains available for custom presets and follows the extension's lookup: `PI_CODING_AGENT_DIR/web-search.json`, otherwise `XDG_CONFIG_HOME/pi/web-search.json`, otherwise `~/.pi/web-search.json`.
 
