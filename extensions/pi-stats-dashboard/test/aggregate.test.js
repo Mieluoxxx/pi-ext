@@ -23,6 +23,7 @@ test("aggregates sessions, forks, transcripts, tools and warnings", async () => 
   assert.equal(out.behavior.messages, 1);
   assert.ok(out.behavior.anguish > 0);
   assert.equal(out.by.tool.bash.requests, 1);
+  assert.equal(out.ranges.today.by.tool.bash.requests, 1);
   assert.deepEqual(out.errors, [["HTTP 502", 1]]);
   assert.equal(out.totals.all.errors, 1);
   assert.equal(out.hours[String(new Date().getHours())].requests, 4);
