@@ -89,6 +89,7 @@ export function regUndo(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "undo_last_change",
     label: "Undo Last Change",
+    exposure: "deferred",
     description: loadP("../prompts/undo-last-change.md"),
     promptSnippet: loadP("../prompts/undo-last-change-snippet.md"),
     promptGuidelines: loadGuide("../prompts/undo-last-change-guidelines.md"),

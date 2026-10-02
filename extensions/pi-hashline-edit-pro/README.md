@@ -87,7 +87,7 @@ Edge cases:
 
 ## The replace tool
 
-The built-in `edit` tool is disabled. `replace` and `insert` are the only edit paths, and both take the anchors from `read` output.
+`replace`, `insert`, and `undo_last_change` are registered with `deferred` exposure: the built-in `edit` stays the main editor, and `tool_search` loads these tools when an edit needs `read` anchors. Both edit tools take the anchors from `read` output.
 
 One edit per call, with `remove_from`, `remove_to`, and `replacement_lines` at the top level:
 

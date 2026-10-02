@@ -39,8 +39,6 @@ export default function (pi: ExtensionAPI): void {
   let autoRead = true;
 
   pi.on("session_start", async (_event, ctx) => {
-    const active = pi.getActiveTools();
-    pi.setActiveTools(active.filter((t) => t !== "edit"));
     await initHasher();
     try {
       const store = await loadHashStore();

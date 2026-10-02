@@ -55,6 +55,26 @@ describe("extension registration", () => {
       expect(eventNames).toEqual(["session_start", "tool_result"]);
     });
   });
+  it("defers the anchor edit tools to tool_search and keeps read and grep direct", async () => {
+    await withTempDir("register-exposure-", async () => {
+      const exposures: Record<string, string | undefined> = {};
+      const pi = {
+        registerTool(tool: { name: string; exposure?: string }) {
+          exposures[tool.name] = tool.exposure;
+        },
+        registerCommand() {},
+        on() {},
+      } as any;
+      register(pi);
+      expect(exposures).toEqual({
+        read: undefined,
+        grep: undefined,
+        replace: "deferred",
+        insert: "deferred",
+        undo_last_change: "deferred",
+      });
+    });
+  });
 
 });
 

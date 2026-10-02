@@ -160,6 +160,7 @@ export function buildInsertToolDef(): InsertToolDef {
   return {
     name: "insert",
     label: "Insert",
+    exposure: "deferred",
     description: loadP("../prompts/insert.md"),
     promptSnippet: loadP("../prompts/insert-snippet.md"),
     promptGuidelines: loadGuide("../prompts/insert-guidelines.md"),

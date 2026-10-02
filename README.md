@@ -16,7 +16,7 @@
 | `pi-session-fork` | `/btw` inline 进入上下文、`/btw` outline 用只读快照直调模型不打扰会话；`/btw` 能够 fork 会话并实现 Herdr 分屏 | - |
 | `pi-interactive-shell` | 改进原本的命令，提升 Agent 工具调用正确率 | [nicobailon/pi-interactive-shell](https://github.com/nicobailon/pi-interactive-shell) @ `87938ca`（v0.15.0） |
 | `pi-tool-display` | 增加对 MCP 工具、Apply Patch 工具的渲染 | [MasuRii/pi-tool-display](https://github.com/MasuRii/pi-tool-display) @ `91cef75`（v0.5.0） |
-| `pi-hashline-edit-pro` | 增加 `disabledTools` 配置，可禁用与其它扩展冲突的工具 | [YuGiMob/pi-hashline-edit-pro](https://github.com/YuGiMob/pi-hashline-edit-pro) @ `77d545e`（v2.7.2，本地 patch 分支 `local/disabled-tools`） |
+| `pi-hashline-edit-pro` | 增加 `disabledTools` 配置，可禁用与其它扩展冲突的工具；锚点编辑工具以 `deferred` 暴露，由 `tool_search` 按需加载 | [YuGiMob/pi-hashline-edit-pro](https://github.com/YuGiMob/pi-hashline-edit-pro) @ `77d545e`（v2.7.2，本地 patch 分支 `local/disabled-tools`） |
 | `pi-openai-tools` | 上下文窗口、远程压缩 v2、图像生成/编辑、Astra 兼容及 apply_patch；不含托管搜索或 auto 审查 | [awoaCrim/pi-openai-toolkit](https://github.com/awoaCrim/pi-openai-toolkit) v0.14.5 源码快照（无 Git 元数据）；[code-yeongyu/pi-apply-patch](https://github.com/code-yeongyu/pi-apply-patch) @ `8f0d8a6` |
 | `pi-advisor` | 独立 advisor 咨询：稳定缓存前缀、费用计量、预算和锚点裁剪、按收益保活；同模型直接禁用 | 派生自 [juicesharp/rpiv-mono](https://github.com/juicesharp/rpiv-mono) 的 rpiv-advisor 2.11.0；[包文档](extensions/pi-advisor/README.md) |
 
