@@ -44,6 +44,8 @@ async function setupKillHarness(options: SetupOptions = {}) {
 	vi.resetModules();
 	vi.doMock("@earendil-works/pi-coding-agent", () => ({
 		getAgentDir: () => "/tmp/pi-agent",
+		getShellConfig: () => ({ shell: "/bin/bash", args: ["-c"] }),
+		SettingsManager: { create: () => ({ getShellPath: () => undefined }) },
 	}));
 	vi.doMock("@earendil-works/pi-tui", () => ({
 		matchesKey: () => false,

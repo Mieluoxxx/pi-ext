@@ -11,6 +11,8 @@ async function loadConfigModule(agentDir: string) {
 	vi.resetModules();
 	vi.doMock("@earendil-works/pi-coding-agent", () => ({
 		getAgentDir: () => agentDir,
+		getShellConfig: () => ({ shell: "/bin/bash", args: ["-c"] }),
+		SettingsManager: { create: () => ({ getShellPath: () => undefined }) },
 	}));
 	return import("../config.ts");
 }

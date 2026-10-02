@@ -15,7 +15,11 @@ describe("real monitor lifecycle", () => {
 		root = mkdtempSync(join(tmpdir(), "pi-monitor-contract-"));
 		messages = [];
 		vi.resetModules();
-		vi.doMock("@earendil-works/pi-coding-agent", () => ({ getAgentDir: () => root }));
+		vi.doMock("@earendil-works/pi-coding-agent", () => ({
+			getAgentDir: () => root,
+			getShellConfig: () => ({ shell: "/bin/bash", args: ["-c"] }),
+			SettingsManager: { create: () => ({ getShellPath: () => undefined }) },
+		}));
 		const { default: extension } = await import("../index.ts");
 		extension({
 			registerTool(definition: any) { if (definition.name === "interactive_shell") tool = definition; },

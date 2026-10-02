@@ -27,6 +27,8 @@ async function setupHarness(failMonitor = false) {
 	vi.doMock("node:child_process", () => ({ execFileSync, spawn: vi.fn() }));
 	vi.doMock("@earendil-works/pi-coding-agent", () => ({
 		getAgentDir: () => "/tmp/pi-agent",
+		getShellConfig: () => ({ shell: "/bin/bash", args: ["-c"] }),
+		SettingsManager: { create: () => ({ getShellPath: () => undefined }) },
 	}));
 	vi.doMock("@earendil-works/pi-tui", () => ({
 		isKeyRelease: () => false,
@@ -493,6 +495,29 @@ describe("monitor mode", () => {
 		expect(harness.getMonitorOptions()?.monitor?.strategy).toBe("file-watch");
 		expect(harness.getLaunchedCommand()).toContain("-e");
 		expect(harness.getLaunchedCommand()).toContain("uploads");
+	});
+
+	it("quotes Bash-sensitive file-watch paths literally", async () => {
+		const harness = await setupHarness();
+		const result = await harness.toolDef.execute("call-1", {
+			mode: "monitor",
+			monitor: {
+				strategy: "file-watch",
+				fileWatch: { path: "$HOME/it's `pwd`", events: ["change"] },
+				triggers: [{ id: "changed", literal: "CHANGE" }],
+			},
+		}, undefined, undefined, {
+			hasUI: false,
+			cwd: "/tmp/project",
+			ui: {},
+			sessionManager: { getSessionFile: () => "/tmp/project/session.jsonl" },
+		} as any);
+
+		expect(result.isError).not.toBe(true);
+		const launchedCommand = harness.getLaunchedCommand() ?? "";
+		expect(launchedCommand).toContain("$HOME/it");
+		expect(launchedCommand).toContain("`pwd`");
+		expect(launchedCommand).toContain("'\\''");
 	});
 
 	it("returns monitor status summaries", async () => {
