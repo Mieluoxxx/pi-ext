@@ -1,6 +1,6 @@
 {
   "name": "@moguw/pi-openai-tools",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Source-integrated Pi context management, remote compaction v2, image generation, Astra compatibility and apply_patch tools",
   "type": "module",
   "license": "MIT",
