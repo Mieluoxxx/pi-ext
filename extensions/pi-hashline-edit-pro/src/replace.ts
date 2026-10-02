@@ -336,7 +336,6 @@ export function buildToolDef(): ToolDef {
   return {
     name: "replace",
     label: "Replace",
-    // Supplementary to the main edit tool; tool_search loads it when anchor edits are needed.
     exposure: "deferred",
     description: E_DESC,
     parameters,
