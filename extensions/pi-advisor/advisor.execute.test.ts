@@ -86,7 +86,8 @@ describe("executeAdvisor — 4 StopReason branches", () => {
 		expect(completeSimple).not.toHaveBeenCalled();
 		const options = runtime.completeSimple.mock.calls[0]?.[2] as Record<string, unknown> | undefined;
 		expect(options).toHaveProperty("sessionId", "advisor:test-session");
-		expect(options).toHaveProperty("signal", undefined);
+		// The consultation deadline is always armed by default.
+		expect(options?.signal).toBeInstanceOf(AbortSignal);
 		expect(options).toHaveProperty("reasoning", undefined);
 		expect(options).not.toHaveProperty("apiKey");
 		expect(options).not.toHaveProperty("headers");
@@ -146,15 +147,98 @@ describe("executeAdvisor — 4 StopReason branches", () => {
 
 	it("error stopReason returns wrapped errorMessage", async () => {
 		setAdvisorModel({ provider: "a", id: "m" } as never);
-		vi.mocked(completeSimple).mockResolvedValueOnce(resp({ stopReason: "error", errorMessage: "502" }) as never);
+		const deterministic = "context_too_large: Your input exceeds the context window";
+		vi.mocked(completeSimple).mockResolvedValueOnce(resp({ stopReason: "error", errorMessage: deterministic }) as never);
 		const { pi, captured } = createMockPi();
 		registerAdvisorTool(pi);
 		const ctx = createMockCtx();
 		const r = await captured.tools.get("advisor")?.execute?.("tc", {}, undefined as never, undefined as never, ctx);
-		expect(r?.content[0]).toMatchObject({ text: expect.stringContaining("502") });
-		expect(r?.details).toMatchObject({ stopReason: "error", errorMessage: "502" });
-		// R6.4 guard: an error stopReason short-circuits — NOT retried.
+		expect(r?.content[0]).toMatchObject({ text: expect.stringContaining("context_too_large") });
+		expect(r?.details).toMatchObject({ stopReason: "error", errorMessage: deterministic });
+		// R6.4 guard: a non-transient error short-circuits — NOT retried.
 		expect(completeSimple).toHaveBeenCalledTimes(1);
+	});
+
+	it("re-sends a transient provider failure once and returns the retried answer", async () => {
+		setAdvisorModel({ provider: "a", id: "m" } as never);
+		vi.mocked(completeSimple)
+			.mockResolvedValueOnce(
+				resp({ stopReason: "error", errorMessage: "server_error: Upstream stream ended before a terminal response event." }) as never,
+			)
+			.mockResolvedValueOnce(resp({ text: "advice after retry" }) as never);
+		const { pi, captured } = createMockPi();
+		registerAdvisorTool(pi);
+		const ctx = createMockCtx();
+		vi.useFakeTimers();
+		try {
+			const pending = captured.tools.get("advisor")?.execute?.("tc", {}, undefined as never, undefined as never, ctx);
+			await vi.advanceTimersByTimeAsync(2000);
+			const r = await pending;
+			expect(r?.content[0]).toMatchObject({ text: "advice after retry" });
+			expect((r?.details as { attempts?: unknown[] }).attempts).toHaveLength(2);
+			expect(completeSimple).toHaveBeenCalledTimes(2);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("retries a transient failure at most once", async () => {
+		setAdvisorModel({ provider: "a", id: "m" } as never);
+		vi.mocked(completeSimple).mockResolvedValue(resp({ stopReason: "error", errorMessage: "502 Bad Gateway" }) as never);
+		const { pi, captured } = createMockPi();
+		registerAdvisorTool(pi);
+		const ctx = createMockCtx();
+		vi.useFakeTimers();
+		try {
+			const pending = captured.tools.get("advisor")?.execute?.("tc", {}, undefined as never, undefined as never, ctx);
+			await vi.advanceTimersByTimeAsync(2000);
+			const r = await pending;
+			expect(r?.details).toMatchObject({ stopReason: "error", errorMessage: "502 Bad Gateway" });
+			expect(completeSimple).toHaveBeenCalledTimes(2);
+		} finally {
+			vi.useRealTimers();
+			vi.mocked(completeSimple).mockReset();
+		}
+	});
+
+	it("returns a timeout result when the consultation deadline fires", async () => {
+		setAdvisorModel({ provider: "a", id: "m" } as never);
+		writeBudget({ timeoutSec: 5 });
+		vi.mocked(completeSimple).mockImplementationOnce(
+			(_model, _context, options) =>
+				new Promise((resolve) => {
+					const signal = (options as { signal?: AbortSignal }).signal;
+					signal?.addEventListener("abort", () => resolve(resp({ stopReason: "aborted", errorMessage: "aborted" }) as never));
+				}),
+		);
+		const { pi, captured } = createMockPi();
+		registerAdvisorTool(pi);
+		const ctx = createMockCtx();
+		vi.useFakeTimers();
+		try {
+			const pending = captured.tools.get("advisor")?.execute?.("tc", {}, undefined as never, undefined as never, ctx);
+			await vi.advanceTimersByTimeAsync(5000);
+			const r = await pending;
+			expect(r?.content[0]).toMatchObject({ text: expect.stringContaining("timed out after 5s") });
+			expect(r?.details).toMatchObject({ stopReason: "error", errorMessage: "deadline exceeded" });
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("reports a user cancel as aborted, not as a timeout", async () => {
+		setAdvisorModel({ provider: "a", id: "m" } as never);
+		const controller = new AbortController();
+		vi.mocked(completeSimple).mockImplementationOnce(async () => {
+			controller.abort();
+			return resp({ stopReason: "aborted", errorMessage: "aborted" }) as never;
+		});
+		const { pi, captured } = createMockPi();
+		registerAdvisorTool(pi);
+		const ctx = createMockCtx();
+		const r = await captured.tools.get("advisor")?.execute?.("tc", {}, controller.signal, undefined as never, ctx);
+		expect(r?.content[0]).toMatchObject({ text: "Advisor call was cancelled before it completed." });
+		expect(r?.details).toMatchObject({ stopReason: "aborted" });
 	});
 
 	it("empty-response retries once then surfaces ERR_EMPTY_RESPONSE envelope", async () => {

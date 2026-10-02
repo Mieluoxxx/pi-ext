@@ -63,6 +63,24 @@ export function getRuntimeCompleteSimple(modelRegistry: unknown): CompleteSimple
 	}
 }
 
+type TransientClassifier = (message: import("@earendil-works/pi-ai").AssistantMessage) => boolean;
+
+/**
+ * pi-ai's transient-provider-error classifier, when the host ships one. A static
+ * named import would fail extension load on a host whose pi-ai predates the
+ * export; returning undefined keeps such hosts on the no-retry behaviour.
+ */
+export async function loadTransientClassifier(): Promise<TransientClassifier | undefined> {
+	try {
+		const mod = (await import("@earendil-works/pi-ai")) as { isRetryableAssistantError?: unknown };
+		return typeof mod.isRetryableAssistantError === "function"
+			? (mod.isRetryableAssistantError as TransientClassifier)
+			: undefined;
+	} catch {
+		return undefined;
+	}
+}
+
 /**
  * Error codes meaning "the /compat entrypoint is not resolvable on this host":
  *   - `ERR_PACKAGE_PATH_NOT_EXPORTED` — Node's ESM resolver when the installed

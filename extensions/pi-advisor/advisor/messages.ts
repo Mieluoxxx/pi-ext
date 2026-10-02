@@ -10,6 +10,11 @@ import type { ThinkingLevel } from "@earendil-works/pi-ai";
 export const ADVISOR_TOOL_NAME = "advisor";
 export const TOOL_LABEL = "Advisor";
 
+// Completion review — custom message type of a delivered review, and the status slot
+export const ADVISOR_REVIEW_TYPE = "advisor-review";
+export const REVIEW_STATUS_KEY = "advisor-review";
+export const MSG_REVIEWING = "Advisor reviewing…";
+
 // Selector sentinels — double-underscore form is collision-proof against real provider:id keys
 export const NO_ADVISOR_VALUE = "__no_advisor__";
 export const OFF_VALUE = "__off__";
@@ -41,6 +46,7 @@ export const ERR_EMPTY_RESPONSE = "Advisor returned no text content.";
 export const ERR_NO_MODEL_SELECTED = "no advisor model selected";
 export const ERR_EMPTY_RESPONSE_DETAIL = "empty response";
 export const ERR_ABORTED_DETAIL = "aborted";
+export const ERR_DEADLINE_DETAIL = "deadline exceeded";
 export const ERR_UNKNOWN = "unknown error";
 
 // Errors/messages (parameterized)
@@ -49,6 +55,8 @@ export const errNoApiKey = (label: string) => `Advisor (${label}) has no API key
 export const errNoApiKeyDetail = (provider: string) => `no API key for ${provider}`;
 export const errCallFailed = (err: string | undefined) => `Advisor call failed: ${err ?? ERR_UNKNOWN}`;
 export const errCallThrew = (msg: string) => `Advisor call threw: ${msg}`;
+export const errTimedOut = (sec: number) =>
+	`Advisor timed out after ${sec}s. Continue without advisor; do not retry this consultation.`;
 export const errSelectionNotFound = (choice: string) => `Advisor selection not found: ${choice}`;
 export const errModelUnavailable = (key: string) => `Previously configured advisor model ${key} is no longer available`;
 export const msgAdvisorEnabled = (label: string, effort: ThinkingLevel | undefined) =>

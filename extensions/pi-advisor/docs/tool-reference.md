@@ -41,9 +41,16 @@ Each call assembles the request in this order:
      executor's own context, are withheld from the advisor too.
 3. **Past consultations** — each completed consultation contributes the executor's
    question and, as the only assistant turns in the request, the advice that
-   answered it. Failed, aborted and skipped consultations are omitted. The in-flight
+   answered it. A delivered [completion review](./configuration.md#review)
+   contributes its answer the same way, under a review marker instead of a
+   question. Failed, aborted and skipped consultations are omitted. The in-flight
    call's prose becomes the current question, and the request always ends on an
    instruction, never on a pending action.
+
+The answer opens with one verdict line — `Severity: none`, `nit`, `concern` or
+`blocker` — followed by the plan or correction. `none` is the expected answer
+when nothing material is wrong, so a check-in before declaring done can come back
+as one sentence instead of manufactured advice.
 
 Executor activity is always DATA inside a user-role `<executor_log>`; only the
 advisor's own past advice takes the assistant role. Replaying executor turns as
@@ -130,8 +137,13 @@ keeps going rather than crashing the turn.
 | `Advisor (<label>) has no API key available.` | `no API key for <provider>` |
 | `Advisor call was cancelled before it completed.` | the provider's error message, or `aborted` |
 | `Advisor call failed: <err>` | the provider's error message |
+| `Advisor timed out after <n>s. Continue without advisor; do not retry this consultation.` | `deadline exceeded` |
 | `Advisor returned no text content.` | `empty response` |
 | `Advisor call threw: <msg>` | the thrown message |
+
+A failure pi-ai classifies as transient (overload, 5xx, an upstream stream that
+ended early, a request timeout) is re-sent once before it surfaces, while less than
+half of `budget.timeoutSec` has elapsed; both attempts stay in `details.attempts`.
 
 The budget gate can also return `Advisor skipped: …` with `details.skipped: true`.
 The executor should continue without repeating that consultation. See

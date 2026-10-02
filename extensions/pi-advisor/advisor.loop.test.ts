@@ -192,4 +192,41 @@ describe("advisor loop", () => {
 		expect(h.run).not.toHaveBeenCalled();
 		expect(JSON.stringify(h.complete.mock.calls[0][1].tools)).toBe("[]");
 	});
+
+	it("re-sends a transient error once, re-pricing the retry", async () => {
+		const h = harness();
+		const failed = { ...answer(""), stopReason: "error", errorMessage: "server_error" } as AssistantMessage;
+		h.complete.mockResolvedValueOnce(failed).mockResolvedValueOnce(answer("recovered"));
+		const approve = vi.fn(async () => true);
+		vi.useFakeTimers();
+		try {
+			const pending = h.invoke({ approve, isTransient: () => true });
+			await vi.advanceTimersByTimeAsync(2000);
+			const out = await pending;
+			expect(out.text).toBe("recovered");
+			expect(h.attempts.map((a) => a.stopReason)).toEqual(["error", "done"]);
+			expect(approve).toHaveBeenCalledTimes(2);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("does not retry an error the classifier rejects", async () => {
+		const h = harness();
+		h.complete.mockResolvedValueOnce({ ...answer(""), stopReason: "error", errorMessage: "bad request" } as AssistantMessage);
+		const out = await h.invoke({ isTransient: () => false });
+		expect(out.stopReason).toBe("error");
+		expect(h.complete).toHaveBeenCalledTimes(1);
+	});
+
+	it("stops waiting to retry when the signal aborts during the backoff", async () => {
+		const h = harness();
+		const controller = new AbortController();
+		h.complete.mockResolvedValueOnce({ ...answer(""), stopReason: "error", errorMessage: "server_error" } as AssistantMessage);
+		const pending = h.invoke({ signal: controller.signal, isTransient: () => true });
+		controller.abort();
+		const out = await pending;
+		expect(out.stopReason).toBe("aborted");
+		expect(h.complete).toHaveBeenCalledTimes(1);
+	});
 });

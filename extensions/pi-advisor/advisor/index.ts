@@ -21,6 +21,7 @@
  *   tools      — read-only investigation surface
  *   prompt     — system-prompt loader
  *   execute    — the advisor side-call
+ *   review     — background completion review after a final answer
  *   register   — advisor tool registration
  *   handlers   — mid-session lifecycle handlers
  *   restore    — session_start restoration
@@ -39,6 +40,12 @@ export {
 export { getInventoryMessage, stableStringify } from "./inventory.js";
 export { ADVISOR_TOOL_NAME } from "./messages.js";
 export { setDisabledForModels } from "./policy.js";
-export { DEFAULT_PROMPT_GUIDELINES, DEFAULT_PROMPT_SNIPPET, registerAdvisorTool } from "./register.js";
+export {
+	DEFAULT_PROMPT_GUIDELINES,
+	DEFAULT_PROMPT_SNIPPET,
+	REVIEW_PROMPT_GUIDELINES,
+	registerAdvisorTool,
+} from "./register.js";
+export { parseAdvisorSeverity, registerAdvisorReview, reviewableRun } from "./review.js";
 export { __resetAdvisorAnnounced, registerAdvisorSessionStart, restoreAdvisorState } from "./restore.js";
 export { getAdvisorEffort, getAdvisorModel, setAdvisorEffort, setAdvisorModel } from "./state.js";

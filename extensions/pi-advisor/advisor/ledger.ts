@@ -45,7 +45,7 @@ import {
 	renderVerbatimRound,
 	type ToolRound,
 } from "./cards.js";
-import { ADVISOR_TOOL_NAME } from "./messages.js";
+import { ADVISOR_REVIEW_TYPE, ADVISOR_TOOL_NAME } from "./messages.js";
 
 /** Bumped when the rendered shape changes, so cost estimation never compares
  *  a stable-prefix hash across two different ledger formats. */
@@ -57,6 +57,11 @@ export const LOG_CLOSE = "</executor_log>";
 const TAIL_HEADER = "Most recent work, verbatim:";
 const FINAL_INSTRUCTION =
 	"Advise the executor on the situation above. Ground every claim in the log; do not invent executor actions.";
+/** Closing instruction of a completion review, in place of FINAL_INSTRUCTION. */
+export const REVIEW_INSTRUCTION =
+	"The executor has just delivered its final answer to the user: the last [executor] text above. Review the delivered work, not the plan. Is the answer correct, and is the work it reports actually done and verified? When files changed, run git_diff before judging completeness. `Severity: none` means the answer stands as delivered; then stop. Ground every claim in the log or in what you read; do not invent executor actions.";
+/** Replaces the question line of a past completion-review segment. */
+const REVIEW_MARKER = "Completion review: the executor had just delivered the answer above.";
 const PRE_BOUNDARY_HEADER =
 	"The user's own words before the summary boundary (verbatim, in order — these are the authoritative statement of intent):";
 const TRIM_HEADER =
@@ -76,6 +81,8 @@ export interface LedgerOptions {
 	 * drifts as the branch grows.
 	 */
 	anchorEntryId?: string;
+	/** Closing instruction; defaults to the consultation instruction. */
+	instruction?: string;
 }
 
 export interface LedgerView {
@@ -131,6 +138,8 @@ interface Segment {
 	blocks: LedgerBlock[];
 	question?: string;
 	advice?: string;
+	/** Closed by a background completion review rather than an executor question. */
+	review?: boolean;
 }
 
 interface Compiled {
@@ -188,9 +197,10 @@ function compile(branch: readonly SessionEntry[], leafId: string | null, options
 	const rounds: { index: number; round: ToolRound }[] = [];
 	let pendingQuestion: string | undefined;
 
-	const pushSegment = (question: string | undefined, advice: string | undefined) => {
+	const pushSegment = (question: string | undefined, advice: string | undefined, review = false) => {
 		current.question = question;
 		current.advice = advice;
+		if (review) current.review = true;
 		segments.push(current);
 		current = { blocks: [] };
 		// Round indices address `current.blocks`, which is a NEW array from here on.
@@ -204,6 +214,13 @@ function compile(branch: readonly SessionEntry[], leafId: string | null, options
 		const summary = renderSummary(entry);
 		if (summary) {
 			current.blocks.push(summary);
+			continue;
+		}
+		if (entry.type === "custom_message" && entry.customType === ADVISOR_REVIEW_TYPE) {
+			// A delivered review is the advisor's own answer: replay it in the
+			// assistant role, not as an extension note the advisor was shown.
+			const advice = reviewAdviceText(entry);
+			if (advice) pushSegment(undefined, advice, true);
 			continue;
 		}
 		if (entry.type === "custom_message") {
@@ -294,6 +311,16 @@ function compile(branch: readonly SessionEntry[], leafId: string | null, options
 
 	segments.push(current);
 	return { segments, tail, pendingQuestion, preBoundaryUser };
+}
+
+/** The advisor's raw review text; the delivered content also carries the advisory wrapper. */
+function reviewAdviceText(entry: SessionEntry & { type: "custom_message" }): string | undefined {
+	const advice = (entry.details as { advice?: unknown } | undefined)?.advice;
+	if (typeof advice === "string" && advice.trim()) return advice.trim();
+	const content = typeof entry.content === "string"
+		? entry.content
+		: entry.content.filter((c): c is TextContent => c.type === "text").map((c) => c.text).join("\n");
+	return content.trim() || undefined;
 }
 
 function blockText(blocks: LedgerBlock[]): string {
@@ -400,8 +427,9 @@ function assemble(compiled: Compiled, options: LedgerOptions, dropBefore: number
 		if (blocks.length) parts.push(`${LOG_OPEN}\n${blockText(blocks)}\n${LOG_CLOSE}`);
 		if (isLast && compiled.tail.length) parts.push(`${TAIL_HEADER}\n${blockText(compiled.tail)}`);
 		const question = isLast ? compiled.pendingQuestion : segment.question;
-		if (question) parts.push(`Executor's question: ${question}`);
-		if (isLast) parts.push(FINAL_INSTRUCTION);
+		if (!isLast && segment.review) parts.push(REVIEW_MARKER);
+		else if (question) parts.push(`Executor's question: ${question}`);
+		if (isLast) parts.push(options.instruction ?? FINAL_INSTRUCTION);
 
 		record(blocks);
 		if (isLast) record(compiled.tail);

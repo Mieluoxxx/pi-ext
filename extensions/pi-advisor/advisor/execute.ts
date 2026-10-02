@@ -7,7 +7,7 @@
  * built in exactly one place.
  */
 
-import type { Context, Message, StopReason, ThinkingLevel, Usage } from "@earendil-works/pi-ai";
+import type { AssistantMessage, Context, Message, StopReason, ThinkingLevel, Usage } from "@earendil-works/pi-ai";
 import {
 	type AgentToolResult,
 	type AgentToolUpdateCallback,
@@ -25,17 +25,19 @@ import {
 	sumAdvisorUsage,
 } from "./budget.js";
 import {
+	type AdvisorBudget,
 	loadAdvisorConfig,
 	validateAdvisorBudget,
 	validateAdvisorLedger,
 	validateAdvisorTools,
 } from "./config.js";
 import { getInventoryMessage } from "./inventory.js";
-import { LEDGER_VERSION, type LedgerView, renderLedger } from "./ledger.js";
+import { LEDGER_VERSION, type LedgerView, REVIEW_INSTRUCTION, renderLedger } from "./ledger.js";
 import { runAdvisorLoop, type AdvisorLoopRound } from "./loop.js";
 import {
 	ERR_ABORTED_DETAIL,
 	ERR_CALL_ABORTED,
+	ERR_DEADLINE_DETAIL,
 	ERR_EMPTY_RESPONSE,
 	ERR_EMPTY_RESPONSE_DETAIL,
 	ERR_NO_MODEL,
@@ -45,15 +47,16 @@ import {
 	errMisconfigured,
 	errNoApiKey,
 	errNoApiKeyDetail,
+	errTimedOut,
 	msgConsulting,
 } from "./messages.js";
-import { getRuntimeCompleteSimple, loadCompleteSimple } from "./pi-compat.js";
+import { getRuntimeCompleteSimple, loadCompleteSimple, loadTransientClassifier } from "./pi-compat.js";
 import { ADVISOR_SYSTEM_PROMPT } from "./prompt.js";
 import { getAdvisorEffort, getAdvisorModel } from "./state.js";
 import { createAdvisorToolRuntime } from "./tools.js";
 import { advisorPayloadHash, rememberAdvisorRequest, stopAdvisorWarming } from "./warming.js";
 
-interface AdvisorDetails {
+export interface AdvisorDetails {
 	context?: {
 		trimmed: boolean;
 		anchorEntryId?: string;
@@ -112,6 +115,40 @@ function buildAdvisorResult(opts: {
 	return { content: [{ type: "text", text: opts.text }], details, ...(opts.usage ? { usage: opts.usage } : {}) };
 }
 
+/**
+ * Wall-clock cap for one consultation. It stops counting while a budget prompt
+ * waits on the user, so a slow click does not spend the executor's time budget.
+ */
+function startDeadline(ms: number) {
+	const controller = new AbortController();
+	let remaining = ms;
+	let since = Date.now();
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const arm = () => {
+		since = Date.now();
+		timer = setTimeout(() => controller.abort(), remaining);
+		timer.unref?.();
+	};
+	arm();
+	return {
+		signal: controller.signal,
+		elapsedMs: () => ms - remaining + (timer ? Date.now() - since : 0),
+		pause() {
+			if (!timer) return;
+			clearTimeout(timer);
+			timer = undefined;
+			remaining = Math.max(0, remaining - (Date.now() - since));
+		},
+		resume() {
+			if (!timer && !controller.signal.aborted) arm();
+		},
+		clear() {
+			clearTimeout(timer);
+			timer = undefined;
+		},
+	};
+}
+
 function buildErrorResult(
 	advisorLabel: string | undefined,
 	effort: ThinkingLevel | undefined,
@@ -121,11 +158,21 @@ function buildErrorResult(
 	return buildAdvisorResult({ text: userText, effort, advisorLabel, errorMessage });
 }
 
+export interface AdvisorCallOptions {
+	/**
+	 * A background completion review: closes the ledger with the review
+	 * instruction, and never prompts for budget — nobody is waiting on a
+	 * dialog, so an over-budget review is skipped.
+	 */
+	review?: boolean;
+}
+
 export async function executeAdvisor(
 	ctx: ExtensionContext,
 	pi: ExtensionAPI,
 	signal: AbortSignal | undefined,
 	onUpdate: AgentToolUpdateCallback<AdvisorDetails> | undefined,
+	options: AdvisorCallOptions = {},
 ): Promise<AgentToolResult<AdvisorDetails>> {
 	// Snapshot effort once at entry — every result envelope and the API call
 	// itself use this same value so a concurrent setAdvisorEffort() during the
@@ -162,6 +209,7 @@ export async function executeAdvisor(
 
 	const config = loadAdvisorConfig();
 	const budget = validateAdvisorBudget(config.budget);
+	const gate: AdvisorBudget = options.review ? { ...budget, onExceed: "skip" } : budget;
 	const ledgerConfig = validateAdvisorLedger(config.ledger);
 	const toolConfig = validateAdvisorTools(config.tools);
 
@@ -186,6 +234,7 @@ export async function executeAdvisor(
 			tailToolCalls: ledgerConfig.tailToolCalls,
 			...(tokenBudget === undefined ? {} : { tokenBudget }),
 			...(savedAnchor ? { anchorEntryId: savedAnchor.entryId } : {}),
+			...(options.review ? { instruction: REVIEW_INSTRUCTION } : {}),
 		});
 		const messages = inventoryMessage ? [inventoryMessage, ...view.messages] : view.messages;
 		return { view, messages };
@@ -238,6 +287,8 @@ export async function executeAdvisor(
 	let budgetExhausted = false;
 	// Set when the executor switched onto the advisor's model mid-consultation.
 	let sameModel = false;
+	let deadline: ReturnType<typeof startDeadline> | undefined;
+	const timedOut = () => !!deadline?.signal.aborted && !signal?.aborted;
 	const finish = (text: string, stopReason?: StopReason, errorMessage?: string, skipped = false): AdvisorResult => {
 		const usage = sumAdvisorUsage(attempts.map((attempt) => attempt.usage));
 		refreshAdvisorStatus(ctx, usage);
@@ -290,14 +341,31 @@ export async function executeAdvisor(
 			details: { advisorModel: advisorLabel, effort, estimate },
 		});
 
+		deadline = budget.timeoutSec > 0 ? startDeadline(budget.timeoutSec * 1000) : undefined;
+		const callSignal = deadline && signal ? AbortSignal.any([signal, deadline.signal]) : (deadline?.signal ?? signal);
+		const classify = await loadTransientClassifier();
+		// A retry in the second half of the window would only turn one failure
+		// into a timeout.
+		const isTransient = classify
+			? (response: AssistantMessage) =>
+					classify(response) && (!deadline || deadline.elapsedMs() < budget.timeoutSec * 500)
+			: undefined;
+
 		// The runtime resolves OAuth credentials. Only legacy hosts need explicit auth overrides.
 		const completeSimple = runtimeCompleteSimple ?? (await loadCompleteSimple());
 		const onPayload = (payload: unknown) => {
 			request.payloadHash = advisorPayloadHash(payload);
 		};
 		const requestOptions = runtimeCompleteSimple
-			? { signal, reasoning: effort, sessionId, onPayload }
-			: { apiKey: auth.apiKey, headers: auth.headers, signal, reasoning: effort, sessionId, onPayload };
+			? { signal: callSignal, reasoning: effort, sessionId, onPayload }
+			: {
+					apiKey: auth.apiKey,
+					headers: auth.headers,
+					signal: callSignal,
+					reasoning: effort,
+					sessionId,
+					onPayload,
+				};
 
 		const toolRuntime = toolConfig.enabled && toolConfig.maxRounds > 0
 			? createAdvisorToolRuntime(
@@ -322,12 +390,20 @@ export async function executeAdvisor(
 			requestOptions,
 			complete: completeSimple,
 			...(toolRuntime ? { tools: toolRuntime } : {}),
+			...(isTransient ? { isTransient } : {}),
 			maxRounds: toolRuntime ? toolConfig.maxRounds : 0,
-			signal,
+			signal: callSignal,
 			attempts,
 			rounds,
 			approve: async (spent) => {
-				if (!(await approveAdvisorCost(ctx, estimate, budget, spent))) return false;
+				deadline?.pause();
+				let approved: boolean;
+				try {
+					approved = await approveAdvisorCost(ctx, estimate, gate, spent);
+				} finally {
+					deadline?.resume();
+				}
+				if (!approved) return false;
 				// Re-checked on every round, and AFTER the cost prompt: the budget
 				// confirmation is an await window during which the user can /model
 				// the executor onto the advisor's own model.
@@ -364,6 +440,7 @@ export async function executeAdvisor(
 				);
 			return skip();
 		}
+		if (timedOut() && !outcome.text) return finish(errTimedOut(budget.timeoutSec), "error", ERR_DEADLINE_DETAIL);
 		if (outcome.stopReason === "aborted")
 			return finish(ERR_CALL_ABORTED, "aborted", outcome.errorMessage ?? ERR_ABORTED_DETAIL);
 		if (outcome.stopReason === "error")
@@ -371,7 +448,10 @@ export async function executeAdvisor(
 		if (!outcome.text) return finish(ERR_EMPTY_RESPONSE, outcome.stopReason, ERR_EMPTY_RESPONSE_DETAIL);
 		return finish(outcome.text, outcome.stopReason);
 	} catch (err) {
+		if (timedOut()) return finish(errTimedOut(budget.timeoutSec), "error", ERR_DEADLINE_DETAIL);
 		const message = err instanceof Error ? err.message : String(err);
 		return finish(errCallThrew(message), undefined, message);
+	} finally {
+		deadline?.clear();
 	}
 }

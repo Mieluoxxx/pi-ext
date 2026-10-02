@@ -29,6 +29,8 @@ export interface AdvisorRequest {
 }
 
 export const ADVISOR_WARMING_USAGE = "advisor-cache-warming";
+/** Native usage kind of a background completion review; its note carries the envelope details. */
+export const ADVISOR_REVIEW_USAGE = "advisor-completion-review";
 
 export interface AdvisorEstimate {
 	promptTokens: number;
@@ -99,6 +101,27 @@ function advisorRecords(branch: readonly SessionEntry[]) {
 						request: note.request,
 						warming: true,
 						attempts: [{ usage: metered.usage, stopReason: note.stopReason ?? "error" }],
+					},
+				},
+			];
+		}
+		if (metered.type === "usage" && metered.kind === ADVISOR_REVIEW_USAGE) {
+			let note: { request?: AdvisorRequest; effort?: ThinkingLevel; attempts?: AdvisorAttempt[]; skipped?: boolean } =
+				{};
+			try {
+				note = JSON.parse(metered.note ?? "{}");
+			} catch {
+				/* A malformed note still bills; it just cannot seed cache estimation. */
+			}
+			return [
+				{
+					usage: metered.usage,
+					details: {
+						advisorModel: `${metered.provider}:${metered.model}`,
+						effort: note.effort,
+						request: note.request,
+						attempts: note.attempts ?? [{ usage: metered.usage, stopReason: "error" }],
+						skipped: note.skipped,
 					},
 				},
 			];

@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased
+
+- Cap each consultation's wall-clock time with `budget.timeoutSec` (default 420s;
+  time spent on a budget confirmation does not count). Across 1658 recorded
+  consultations, failures held the executor 7.5 hours in total, and the slowest
+  timeouts waited about 1000s each before the transport gave up; the cap returns
+  `Advisor timed out after <n>s` instead. The default sits above the slowest
+  successful consultation measured (p99 269s, max 547s).
+- Re-send a failed request once when pi-ai classifies the error as transient, while
+  less than half the time budget has elapsed. Deterministic failures such as a
+  context-window overflow are still returned immediately; hosts without the
+  classifier keep the previous no-retry behaviour.
+- Open every advisor answer with `Severity: none|nit|concern|blocker`, accept
+  `none` as a one-sentence answer, and add explicit lists of what to look for
+  (premature completion, stubs standing in for implementation, guessing where a
+  check could run) and what to stay out of (intent, scope size, unrequested
+  backwards compatibility, errors the executor already saw).
+- Add an opt-in background completion review (`review.enabled`). After a run settles
+  on a final answer, the advisor reviews it without blocking; a `blocker` starts one
+  executor turn, other findings land as a visible card, and `none` stays silent.
+  Reviews are billed natively as `advisor-completion-review`, count toward the
+  branch budget, and are replayed as past advice in later consultations. With review
+  on, the default guidance stops asking for a blocking consultation before
+  declaring done.
+
 ## 0.2.0 — 2026-09-29
 
 - Compile the executor's branch into a ledger: older tool rounds become one-line

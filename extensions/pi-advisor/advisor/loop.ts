@@ -37,6 +37,24 @@ const BUDGET_EXHAUSTED =
 
 const REFUSED_AFTER_BUDGET = "Tool budget exhausted — no further tool calls will run. Answer with what you have.";
 
+const TRANSIENT_RETRY_DELAY_MS = 2000;
+
+/** Resolves false when the signal aborts before the delay elapses. */
+function abortableDelay(ms: number, signal: AbortSignal | undefined): Promise<boolean> {
+	if (signal?.aborted) return Promise.resolve(false);
+	return new Promise((resolve) => {
+		const onAbort = () => {
+			clearTimeout(timer);
+			resolve(false);
+		};
+		const timer = setTimeout(() => {
+			signal?.removeEventListener("abort", onAbort);
+			resolve(true);
+		}, ms);
+		signal?.addEventListener("abort", onAbort, { once: true });
+	});
+}
+
 export interface AdvisorLoopRound {
 	tool: string;
 	/** Compact argument preview; full arguments stay out of the transcript. */
@@ -98,6 +116,8 @@ export interface AdvisorLoopOptions {
 	onProgress?: (note: string) => void;
 	/** Marks the request whose prefix should be kept warm. */
 	onFirstRequest?: (context: Context, usage: Usage) => void;
+	/** True for a failed response worth re-sending; at most one per consultation. */
+	isTransient?: (response: AssistantMessage) => boolean;
 	/**
 	 * Caller-owned sinks. The loop appends as it goes rather than returning them
 	 * at the end, so a transport throw on round N still leaves rounds 1..N-1
@@ -113,7 +133,9 @@ export interface AdvisorLoopOptions {
  * Returns the final advice text, every billed attempt, and the investigation
  * trace. An empty response is retried exactly once — preserved from the
  * single-shot implementation, where an empty first reply was common enough to
- * be worth one retry and rare enough not to warrant more.
+ * be worth one retry and rare enough not to warrant more. A transient provider
+ * failure is likewise re-sent once: the executor is blocked on this call, and
+ * an error result after a long wait is the worst outcome it can get.
  */
 export async function runAdvisorLoop(options: AdvisorLoopOptions): Promise<AdvisorLoopOutcome> {
 	const { model, complete, tools, signal, attempts, rounds } = options;
@@ -122,6 +144,7 @@ export async function runAdvisorLoop(options: AdvisorLoopOptions): Promise<Advis
 	let budgetExhausted = false;
 	let firstRequest: AdvisorLoopOutcome["firstRequest"];
 	let emptyRetried = false;
+	let transientRetried = false;
 
 	const spent = () =>
 		attempts.reduce((sum, attempt) => sum + (attempt.usage?.cost.total ?? 0), 0);
@@ -140,9 +163,10 @@ export async function runAdvisorLoop(options: AdvisorLoopOptions): Promise<Advis
 		...(budgetExhausted ? { budgetExhausted: true } : {}),
 	});
 
-	// One request per iteration; +2 covers the final answer turn and the single
-	// empty-response retry on top of the investigation allowance.
-	for (let request = 0; request <= options.maxRounds + 2; request++) {
+	// One request per iteration; +3 covers the final answer turn, the single
+	// empty-response retry and the single transient-error retry on top of the
+	// investigation allowance.
+	for (let request = 0; request <= options.maxRounds + 3; request++) {
 		if (signal?.aborted) return finish("", "aborted", "aborted");
 		if (!(await options.approve(spent()))) return finish("", undefined, "budget exceeded or declined");
 
@@ -162,14 +186,23 @@ export async function runAdvisorLoop(options: AdvisorLoopOptions): Promise<Advis
 			throw error;
 		}
 		attempts.push({ usage: response.usage, stopReason: response.stopReason, errorMessage: response.errorMessage });
-		if (!firstRequest && response.usage) {
+		// A failed attempt's usage does not describe a cached prefix; let the retry
+		// (if any) be the request warming keeps alive.
+		if (!firstRequest && response.usage && response.stopReason !== "error") {
 			firstRequest = { context: { ...context, messages: [...conversation] }, usage: response.usage };
 			options.onFirstRequest?.(firstRequest.context, response.usage);
 		}
 
 		if (response.stopReason === "aborted") return finish("", "aborted", response.errorMessage ?? "aborted");
-		if (response.stopReason === "error")
+		if (response.stopReason === "error") {
+			if (!transientRetried && options.isTransient?.(response)) {
+				transientRetried = true;
+				// The loop head re-runs approve(), so the retry is priced like any request.
+				if (!(await abortableDelay(TRANSIENT_RETRY_DELAY_MS, signal))) return finish("", "aborted", "aborted");
+				continue;
+			}
 			return finish("", "error", response.errorMessage ?? "unknown error");
+		}
 
 		const calls = toolCallsOf(response);
 		const text = textOf(response);

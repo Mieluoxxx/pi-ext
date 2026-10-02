@@ -19,6 +19,8 @@ export interface AdvisorBudget {
 	sessionUsd: number;
 	warmWindowSec: number;
 	contextBudgetTokens: number;
+	/** Wall-clock cap for one consultation, investigation rounds included. 0 disables. */
+	timeoutSec: number;
 	onExceed: "confirm" | "skip";
 }
 
@@ -29,6 +31,9 @@ export function validateAdvisorBudget(value: unknown): AdvisorBudget {
 		sessionUsd: 20,
 		warmWindowSec: 1800,
 		contextBudgetTokens: 250000,
+		// Measured: successful consultations p99 269s, max 547s; a dead stream
+		// otherwise held the executor ~1000s before the transport gave up.
+		timeoutSec: 420,
 		onExceed: "confirm",
 	};
 	if (!value || typeof value !== "object") return budget;
@@ -39,6 +44,7 @@ export function validateAdvisorBudget(value: unknown): AdvisorBudget {
 		"sessionUsd",
 		"warmWindowSec",
 		"contextBudgetTokens",
+		"timeoutSec",
 	] as const) {
 		const number = raw[key];
 		if (typeof number === "number" && Number.isFinite(number) && number >= 0) budget[key] = number;
@@ -141,6 +147,27 @@ export function validateAdvisorTools(value: unknown): AdvisorTools {
 	return tools;
 }
 
+/**
+ * Completion review: after the executor settles on a final answer, the advisor
+ * reviews it in the background instead of the executor blocking on a
+ * "before declaring done" consultation.
+ */
+export interface AdvisorReview {
+	enabled: boolean;
+	/** Runs with fewer executor tool calls than this are not reviewed (pure chat). */
+	minToolCalls: number;
+}
+
+export function validateAdvisorReview(value: unknown): AdvisorReview {
+	const review: AdvisorReview = { enabled: false, minToolCalls: 1 };
+	if (!value || typeof value !== "object") return review;
+	const raw = value as Record<string, unknown>;
+	if (typeof raw.enabled === "boolean") review.enabled = raw.enabled;
+	const min = raw.minToolCalls;
+	if (typeof min === "number" && Number.isFinite(min) && min >= 0) review.minToolCalls = Math.floor(min);
+	return review;
+}
+
 interface AdvisorConfig {
 	modelKey?: string;
 	effort?: GradedEffort;
@@ -150,6 +177,7 @@ interface AdvisorConfig {
 	warming?: Partial<AdvisorWarming>;
 	ledger?: Partial<AdvisorLedger>;
 	tools?: Partial<AdvisorTools>;
+	review?: Partial<AdvisorReview>;
 }
 
 export function loadAdvisorConfig(): AdvisorConfig {

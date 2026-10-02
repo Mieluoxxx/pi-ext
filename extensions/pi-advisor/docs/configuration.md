@@ -44,13 +44,14 @@ previous selection and the active tool list are left untouched.
 | `modelKey` | `string` — `"provider/modelId"` | absent (advisor off) | `/advisor` |
 | `effort` | graded thinking level (`minimal` → `max`) | absent (no `reasoning` sent) | `/advisor` effort picker |
 | `disabledForModels` | `(string \| { model, minEffort? })[]` | `[]` | hand-edited |
-| `budget` | object — see below | $1 soft, $3 hard, $20/branch, 250k cold context | hand-edited |
+| `budget` | object — see below | $1 soft, $3 hard, $20/branch, 250k cold context, 420s per consultation | hand-edited |
 | `warming` | object — see below | enabled when TTL and native usage recording are available | hand-edited |
+| `review` | object — see below | off | hand-edited |
 | `guidance.promptSnippet` | `string` | built-in snippet | hand-edited |
 | `guidance.promptGuidelines` | `string[]` | six built-in guidelines | hand-edited |
 
-`/advisor` only ever writes `modelKey` and `effort`; `guidance` and
-`disabledForModels`, `budget` and `warming` are preserved across saves, so hand-edits survive.
+`/advisor` only ever writes `modelKey` and `effort`; `guidance`,
+`disabledForModels`, `budget`, `warming` and `review` are preserved across saves, so hand-edits survive.
 
 ### `modelKey`
 
@@ -170,6 +171,7 @@ programmatic session spawns (workflow stages, subagents) do not repeat it.
     "sessionUsd": 20,
     "warmWindowSec": 1800,
     "contextBudgetTokens": 250000,
+    "timeoutSec": 420,
     "onExceed": "confirm"
   }
 }
@@ -223,6 +225,20 @@ branch summaries reset it. The original transcript is never edited.
 `contextBudgetTokens: 0` disables trimming and ignores saved anchors. A warm view
 retains its full prefix even if it exceeds this token target. The hard USD gate
 still applies.
+
+`timeoutSec` caps one consultation's wall-clock time, investigation rounds
+included. The executor is blocked while it waits, so a stalled provider stream is
+cut off and the executor receives `Advisor timed out after <n>s` with the
+instruction to continue without retrying. Time spent waiting on a budget
+confirmation does not count. `0` disables the cap. The default sits above the
+slowest successful consultation measured in real sessions (p99 269s, max 547s).
+
+A failed request is re-sent once when pi-ai classifies the failure as transient
+(overload, 5xx, an upstream stream that ended early, a request timeout), and only
+while less than half of `timeoutSec` has elapsed. Deterministic failures such as a
+context-window overflow are returned immediately. The retry passes the same budget
+gate as every other request and its billed attempt is kept. Hosts whose pi-ai has
+no transient-error classifier keep the previous behaviour: no retry.
 
 ### `ledger`
 
@@ -371,6 +387,52 @@ at runtime in Pi 0.86. The extension checks for it; older hosts skip warming. Us
 is recorded as `advisor-cache-warming`, without adding a conversation message, and
 counts once in `/session`, the advisor status and the branch budget. The extension's
 compatibility bridge keeps this runtime capability access isolated.
+
+### `review`
+
+```json
+{
+  "review": {
+    "enabled": false,
+    "minToolCalls": 1
+  }
+}
+```
+
+Completion review moves the "before declaring done" consultation into the
+background. When a run settles on a final text answer, the advisor reviews the
+delivered work while the executor and the user carry on; nobody waits on it. A run
+is reviewed when it ended in a text answer with no tool call, did at least
+`minToolCalls` executor tool calls (so pure chat is skipped), and the executor did
+not already consult the advisor after its last tool call. Each final answer is
+reviewed once, and only one review runs at a time.
+
+The review closes the ledger with a review instruction instead of a question, and
+the advisor answers with the same `Severity:` line as a consultation:
+
+| Severity | Delivery |
+| --- | --- |
+| `none` | nothing is shown |
+| `nit` / `concern` | a visible `advisor-review` card that enters the executor's context without starting a turn |
+| `blocker` | the same card, and it starts a turn so the executor acts on it |
+
+A blocker starts at most one turn per user prompt, so a fix the advisor still
+rejects cannot loop. If the user has already started another run when the review
+finishes, the card is held for the next prompt instead of being injected into the
+unrelated run. An answer without a severity line is shown as a `nit`. A failed or
+skipped review shows nothing. Later consultations replay a delivered review as the
+advisor's own past answer.
+
+A review is priced and gated like a consultation, including `timeoutSec`, but an
+over-budget review is skipped rather than prompting. Its usage is recorded natively
+as `advisor-completion-review`, so it counts in `/session`, the advisor status and the
+branch budget; hosts without `SessionManager.appendUsage` never start one.
+Compacting, switching, forking, navigating or shutting down cancels a review in
+flight.
+
+With review enabled, the executor's default guidance drops "call the advisor
+before declaring done" and explains the review card instead. Custom
+`guidance.promptGuidelines` are used as written.
 
 ### Measuring the result
 

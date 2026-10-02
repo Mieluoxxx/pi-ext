@@ -132,14 +132,19 @@ describe("advisor budget", () => {
 		expect(
 			validateAdvisorBudget({ perCallHardUsd: -1, sessionUsd: "10", warmWindowSec: Infinity, onExceed: "invalid" }),
 		).toEqual(budget);
-		expect(validateAdvisorBudget({ perCallHardUsd: 0, sessionUsd: 2, warmWindowSec: 0, onExceed: "skip" })).toEqual({
+		expect(
+			validateAdvisorBudget({ perCallHardUsd: 0, sessionUsd: 2, warmWindowSec: 0, timeoutSec: 0, onExceed: "skip" }),
+		).toEqual({
 			perCallSoftUsd: 1,
 			contextBudgetTokens: 250000,
 			perCallHardUsd: 0,
 			sessionUsd: 2,
 			warmWindowSec: 0,
+			timeoutSec: 0,
 			onExceed: "skip",
 		});
+		expect(validateAdvisorBudget(undefined).timeoutSec).toBe(420);
+		expect(validateAdvisorBudget({ timeoutSec: -5 }).timeoutSec).toBe(420);
 		const ctx = createMockCtx({ hasUI: true, branch });
 		refreshAdvisorStatus(ctx);
 		expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("advisor", "Advisor $0.21 · cache 90%");
