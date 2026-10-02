@@ -46,7 +46,7 @@ describe("latest Pi retained context", () => {
 		expect(removeNativeCompactionRetainedMessages({ ...args, messages })).toEqual({ ok: false, reason: "retained-context-mismatch" });
 		expect(messages).toEqual(before);
 	});
-	test("filters recursive retained history including an earlier compaction summary", () => {
+	test("filters recursive retained history whose range contains an earlier compaction", () => {
 		const args = fixture();
 		args.manager.appendCompaction(NATIVE_COMPACTION_FALLBACK_SUMMARY, args.compactionEntry.firstKeptEntryId, 200,
 			createNativeCompactionDetails({ provider: "openai", api: "openai-responses", model: "gpt-6-astra",
@@ -57,11 +57,23 @@ describe("latest Pi retained context", () => {
 		const latest = resolveLatestNativeCompactionEntry(branchEntries, { baseUrl: "https://offline.invalid/v1" });
 		assert(latest.ok);
 		const messages = args.manager.buildSessionContext().messages;
-		expect(messages.filter((message) => message.role === "compactionSummary")).toHaveLength(2);
+		// Pi 1.0 projects only the newest compaction's summary; the earlier one adds nothing.
+		expect(messages.filter((message) => message.role === "compactionSummary")).toHaveLength(1);
 		const result = removeNativeCompactionRetainedMessages({ messages, branchEntries, compactionEntry: latest.entry });
 		assert(result.ok);
 		expect(result.messages).toEqual([messages[0], messages.at(-1)]);
 		expect(args.manager.getBranch()).toEqual(before);
+	});
+	test("matches retained history after a context edit replaced a retained message", () => {
+		const args = fixture();
+		const toolResult = args.branchEntries.find((entry) => entry.type === "message" && entry.message.role === "toolResult");
+		assert(toolResult);
+		args.manager.appendContextEdit(toolResult.id, { content: [{ type: "text", text: "redacted" }] });
+		const branchEntries = args.manager.getBranch();
+		const messages = args.manager.buildSessionContext().messages;
+		const result = removeNativeCompactionRetainedMessages({ messages, branchEntries, compactionEntry: args.compactionEntry });
+		assert(result.ok);
+		expect(result.messages).toEqual([messages[0], messages.at(-1)]);
 	});
 	test("does not guess a missing boundary or summary", () => {
 		const args = fixture();

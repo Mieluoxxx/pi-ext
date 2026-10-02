@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { compact, convertToLlm } from "@earendil-works/pi-coding-agent";
+import { renderSystemMessageUpdate } from "@earendil-works/pi-ai";
 import type {
 	Api,
 	AssistantMessage,
@@ -171,7 +172,19 @@ export function serializeMessagesToResponsesInput<TApi extends Api>(
 	}
 
 	let messageIndex = 0;
-	for (const message of transformedMessages) {
+	for (const [sourceIndex, message] of transformedMessages.entries()) {
+		// Mirrors pi-ai's Responses conversion: the leading system prompt travels as
+		// `instructions`, and later transcript system updates become instruction items.
+		if (message.role === "system") {
+			if (sourceIndex === 0) continue;
+			const text = renderSystemMessageUpdate(message);
+			if (text.length > 0) {
+				input.push({ role: model.reasoning ? "developer" : "system", content: sanitizeSurrogates(text) });
+			}
+			messageIndex++;
+			continue;
+		}
+
 		if (message.role === "user") {
 			const item = serializeUserMessage(message, model);
 			if (item) {

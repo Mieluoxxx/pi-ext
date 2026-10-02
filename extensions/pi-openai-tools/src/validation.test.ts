@@ -295,7 +295,11 @@ function createContext(args: {
 	resolveAuth?: (model: TestModel) => Promise<Record<string, unknown>> | Record<string, unknown>;
 	onAbort?: () => void;
 } = {}) {
-	const branchEntries = args.branchEntries ?? [];
+	// Real getBranch() entries form a parent chain, which Pi's session projection walks.
+	const branchEntries = (args.branchEntries ?? []).map((entry, index, all) => ({
+		...entry,
+		parentId: index === 0 ? null : all[index - 1]!.id,
+	}));
 	const model = args.model ?? defaultModel;
 	const sessionContextMessages =
 		args.sessionContextMessages ?? branchEntries.filter((entry) => entry.type === "message").map(toReplayMessage);

@@ -1,4 +1,4 @@
-import { sessionEntryToContextMessages } from "@earendil-works/pi-coding-agent";
+import { buildSessionProjection, sessionEntryToContextMessages } from "@earendil-works/pi-coding-agent";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { Api, Model } from "@earendil-works/pi-ai";
 import type {
@@ -331,7 +331,12 @@ export function removeNativeCompactionRetainedMessages(args: {
 	const summary = sessionEntryToContextMessages(args.compactionEntry)[0];
 	const summaryIndex = args.messages.findIndex((message) => areEquivalentValues(message, summary));
 	if (summaryIndex < 0) return { ok: false, reason: "compaction-summary-not-found" };
-	const retained = args.branchEntries.slice(firstKept, boundary).flatMap(sessionEntryToContextMessages);
+	// Pi's projection omits older compactions and system entries in the kept range and
+	// applies context edits; expect exactly what it put into the context.
+	const retainedIds = new Set(args.branchEntries.slice(firstKept, boundary).map((entry) => entry.id));
+	const retained = buildSessionProjection([...args.branchEntries]).entries
+		.filter((projected) => retainedIds.has(projected.sourceEntry.id))
+		.flatMap((projected) => projected.messages);
 	const removed = new Set<number>();
 	let cursor = summaryIndex + 1;
 	for (const expected of retained) {
