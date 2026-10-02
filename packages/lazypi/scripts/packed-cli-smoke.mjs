@@ -31,9 +31,9 @@ export function runPackedCliSmoke({ cwd = process.cwd() } = {}) {
 		const tarballPath = resolve(sandbox, artifact.filename);
 		assert.equal(existsSync(tarballPath), true, `packed tarball was not created at ${tarballPath}`);
 		const paths = artifact.files.map((file) => file.path);
-		for (const name of ["base", "ui", "workflow"]) assert.ok(paths.includes(`presets/${name}/preset.json`));
+		for (const name of ["base", "ui", "workflow", "models"]) assert.ok(paths.includes(`presets/${name}/preset.json`));
 		assert.ok(paths.includes("lib/presets.mjs"));
-		assert.ok(paths.every((path) => /^(package\.json$|README\.md$|LICENSE$|bin\/|lib\/|agent\/|themes\/|presets\/(base|ui|workflow)\/)/.test(path)), "unexpected published file");
+		assert.ok(paths.every((path) => /^(package\.json$|README\.md$|LICENSE$|bin\/|lib\/|agent\/|themes\/|presets\/(base|ui|workflow|models)\/)/.test(path)), "unexpected published file");
 		assert.ok(paths.every((path) => !/(auth\.json|models\.json|\.bak|\.lazypi\.|\.env)/i.test(path)), "private configuration or backup in package");
 		const smoke = run(npm, ["exec", "--yes", `--package=${tarballPath}`, "--call", "lazypi --help"], { cwd });
 		assert.equal(smoke.status, 0, `packed CLI smoke failed\n${resultSummary(smoke)}`);

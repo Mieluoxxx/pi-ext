@@ -306,6 +306,30 @@ test("local package duplicates block both preview and installation", (t) => {
 	assert.deepEqual(backups(state), []);
 });
 
+test("models preset ships placeholder keys and replicates provider defaults", (t) => {
+	const state = workspace(t);
+	const shipped = json("presets/models/providers.json");
+	for (const [name, provider] of Object.entries(shipped.providers)) {
+		assert.match(provider.apiKey, /^\$\w+$/, `${name} must not ship a literal credential`);
+		assert.ok(Array.isArray(provider.models) && provider.models.length > 0, name);
+	}
+	success(run(state, ["--preset", "models", "--yes"]));
+	assert.equal(existsSync(state.calls), false, "configuration-only preset must not invoke pi");
+	assert.deepEqual(Object.keys(json(join(state.agentDir, "models.json")).providers), Object.keys(shipped.providers));
+	const settings = json(join(state.agentDir, "settings.json"));
+	assert.equal(settings.defaultProvider, "cpa-openai-responses");
+	assert.equal(settings.defaultModel, "deepseek-flash");
+});
+
+test("base preset copies the portable mcp servers", (t) => {
+	const state = workspace(t);
+	success(run(state, ["--preset", "base", "--yes"]));
+	const mcp = json(join(state.agentDir, "mcp.json")).mcpServers;
+	assert.match(mcp.cua.command, /^~\//);
+	assert.match(mcp.cua.env.CUA_DRIVER_POLICY_FILE, /^\$\{HOME\}/);
+	assert.equal(json("presets/base/mcp.json").mcpServers.exa.url, mcp.exa.url);
+});
+
 test("replacement packages refuse known legacy conflicts without uninstalling them", (t) => {
 	const state = workspace(t);
 	for (const [id, legacy] of [["advisor", "npm:@juicesharp/rpiv-advisor@1.0.0"], ["advisor", "npm:pi-omp-advisor"], ["openai-tools", "git:github.com/code-yeongyu/pi-apply-patch@v0.1.2"], ["openai-tools", "https://github.com/code-yeongyu/pi-apply-patch.git@v0.1.2"]]) {

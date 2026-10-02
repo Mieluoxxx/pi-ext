@@ -23,6 +23,7 @@
     "presets/base",
     "presets/ui",
     "presets/workflow",
+    "presets/models",
     "README.md",
     "LICENSE",
     "themes",

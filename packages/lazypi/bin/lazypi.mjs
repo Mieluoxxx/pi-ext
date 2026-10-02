@@ -306,7 +306,7 @@ ${bold("Install options:")}
 ${bold("Default behaviour:")}
   - Every catalog extension is installed by default.
   - With --preset, only preset requirements and additional --only selections are installed.
-  - Built-in presets: base, ui, workflow. Later presets override earlier preferences.
+  - Built-in presets: base, ui, workflow, models. Later presets override earlier preferences.
   - Presets cannot be combined with --local or --force; status --preset checks drift.
   - On a TTY, choose everything or review packages one by one with recommendation reasons.
   - With --yes, --force, --only, or --except interactive selection is skipped.

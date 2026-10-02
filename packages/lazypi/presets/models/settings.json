@@ -1,0 +1,4 @@
+{
+  "defaultProvider": "cpa-openai-responses",
+  "defaultModel": "deepseek-flash"
+}

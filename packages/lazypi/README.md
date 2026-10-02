@@ -63,7 +63,16 @@ Catalog updates do **not** migrate existing local-path registrations or uninstal
 - **[Stats dashboard](https://github.com/Mieluoxxx/pi-ext/tree/main/extensions/pi-stats-dashboard)** aggregates local `/stats` usage: lifetime/today/7d/30d tokens, costs and model/project/tool distributions from persisted session JSONL.
 - **[pi-advisor](https://github.com/Mieluoxxx/pi-ext/tree/main/extensions/pi-advisor)** runs independent advisor consultations with stable cache prefixes, budget metering, timeouts and opt-in completion review; it is derived from `rpiv-mono`'s rpiv-advisor. The `advisor-watchdog` config entry installs `WATCHDOG.yml`, which references providers from the device-managed `models.json`.
 
-LazyPi does not copy the maintainer's `models.json` and does not ship a CPA/model preset. Model configuration and credentials remain device-managed. The generic `merge-models` mode is available only for external files explicitly supplied by the user.
+Model configuration ships through the optional `models` preset: the provider catalog is sanitized so every `apiKey` is the `$CPA_API_KEY` environment reference, never a literal credential. `auth.json`, project trust and sessions are never copied; on the maintainer's machine `auth.json` is empty and authentication goes through the local proxy key.
+
+### Replicate this environment on a new machine
+
+```bash
+npx @moguw/lazypi install --preset base --preset ui --preset workflow --preset models --yes
+export CPA_API_KEY=<the local proxy key>   # same value as the maintainer's models.json apiKey
+```
+
+Boundaries the presets do not cover: the CPA proxy itself must run on `localhost:8317` — it is not shipped. The `cua` MCP entry is stored in portable form (`~/.local/bin/cua-driver`, `${HOME}/.cua-driver/policy.yaml`) and degrades gracefully when the driver is absent. Sessions, project trust and credentials stay device-local.
 
 `web-access` is no longer part of this catalog. The dedicated `web-search` preset target remains available for custom presets and follows the extension's lookup: `PI_CODING_AGENT_DIR/web-search.json`, otherwise `XDG_CONFIG_HOME/pi/web-search.json`, otherwise `~/.pi/web-search.json`.
 
@@ -73,9 +82,10 @@ Presets install their catalog requirements and apply configuration files in one 
 
 | Preset | Configuration |
 | --- | --- |
-| `base` | Global AGENTS.md, `xhigh` default thinking, default tools (`+codemode`, `+tool_search`), transcript-search shortcut |
+| `base` | Global AGENTS.md, `xhigh` default thinking, default tools (`+codemode`, `+tool_search`), transcript-search shortcut, MCP servers |
 | `ui` | Zentui preferences, tool-display, token-speed, stats dashboard, Vesper theme files; follows the `system` theme |
 | `workflow` | Workspace history, Goal (100 automatic turns), deferred interactive shell, FFF `tools-and-ui`, hashline editing, automatic naming |
+| `models` | Local CPA proxy provider catalog (`merge-models`), default provider and model; every `apiKey` is a `$CPA_API_KEY` environment reference |
 
 ```bash
 # From this checkout, preview before applying (no installs or writes):
@@ -119,7 +129,7 @@ Presets apply left to right over existing configuration. Later presets override 
 - `copy`: whole-file snapshot for Markdown/YAML (or JSON); existing content is backed up, not merged. Conflicting modes or target casing aliases are rejected.
 - `agent/...`: a configuration path under the resolved agent directory, with nested paths preserved. `web-search` is the dedicated extension-specific target described above.
 - `settings.json` requires merge mode. Presets cannot write resource-registration arrays, trust defaults or selected runtime fields. Catalog compatibility requirements still apply; an explicit conflicting preference fails preflight.
-- Built-in presets remain `base`, `ui`, `workflow`. A bundled CPA preset, credential import and Skills distribution are deferred pending catalog/distribution and routing decisions. `models.json` requires `merge-models`; ordinary merge/copy and noncanonical casing cannot bypass this rule. Auth/trust files, state, caches, installation directories, logs/backups and executable extension files remain forbidden targets.
+- Built-in presets are `base`, `ui`, `workflow` and `models`. Credential import and Skills distribution remain deferred pending catalog/distribution and routing decisions. `models.json` requires `merge-models`; ordinary merge/copy and noncanonical casing cannot bypass this rule. Auth/trust files, state, caches, installation directories, logs/backups and executable extension files remain forbidden targets.
 
 ### Custom model presets
 

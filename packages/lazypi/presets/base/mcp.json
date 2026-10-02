@@ -1,0 +1,59 @@
+{
+  "mcpServers": {
+    "context7": {
+      "url": "https://mcp.context7.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${CONTEXT7_API_KEY}"
+      },
+      "description": "Up-to-date, version-specific documentation and code examples for libraries, frameworks, SDKs, and APIs"
+    },
+    "exa": {
+      "url": "https://mcp.exa.ai/mcp",
+      "headers": {
+        "Authorization": "Bearer ${EXA_API_KEY}"
+      },
+      "description": "Web search, and fetching web pages as clean markdown"
+    },
+    "firecrawl": {
+      "url": "https://mcp.firecrawl.dev/v2/mcp",
+      "headers": {
+        "Authorization": "Bearer ${FIRECRAWL_API_KEY}"
+      },
+      "description": "Scrape, crawl, map, and search websites; parse PDFs and documents into markdown",
+      "toolExposure": {
+        "firecrawl_monitor_*": "hidden",
+        "firecrawl_interact*": "hidden",
+        "*feedback": "hidden"
+      }
+    },
+    "cua": {
+      "command": "~/.local/bin/cua-driver",
+      "args": [
+        "mcp"
+      ],
+      "env": {
+        "CUA_DRIVER_RS_TELEMETRY_ENABLED": "false",
+        "CUA_DRIVER_POLICY_FILE": "${HOME}/.cua-driver/policy.yaml"
+      },
+      "description": "Operate macOS GUI apps and windows on this machine (Cua Driver)",
+      "exposure": "deferred",
+      "toolExposure": {
+        "kill_app": "hidden",
+        "clipboard_*": "hidden",
+        "set_config": "hidden",
+        "install_*": "hidden",
+        "check_for_update": "hidden",
+        "replay_trajectory": "hidden",
+        "*recording*": "hidden",
+        "browser_download": "hidden",
+        "browser_set_input_files": "hidden",
+        "escalate_session": "hidden",
+        "page": "hidden",
+        "bring_to_front": "hidden",
+        "invoke_menu": "hidden",
+        "set_window_frame": "hidden",
+        "get_desktop_state": "hidden"
+      }
+    }
+  }
+}

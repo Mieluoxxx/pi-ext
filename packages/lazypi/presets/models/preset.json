@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "description": "本地 CPA 代理的 provider 目录（merge-models）、默认 provider 与模型",
+  "packages": [],
+  "files": [
+    {
+      "from": "providers.json",
+      "to": "agent/models.json",
+      "mode": "merge-models"
+    },
+    {
+      "from": "settings.json",
+      "to": "agent/settings.json",
+      "mode": "merge"
+    }
+  ]
+}

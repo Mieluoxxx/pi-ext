@@ -4,7 +4,8 @@
 
 - Sync the catalog with the maintainer's current `pi list` snapshot: 16 extensions. `advisor` now installs `@moguw/pi-advisor` (derived from `rpiv-mono`'s rpiv-advisor) instead of `pi-omp-advisor`, and refuses both `pi-omp-advisor` and `@juicesharp/rpiv-advisor` as legacy conflicts. Add `token-speed` (`pi-token-speed`) and `stats-dashboard` (`@moguw/pi-stats-dashboard`). Drop `web-access`, `lazy-tools` and `computer-use`, which are no longer installed, and with them the `lazy-tools` load-order gates (fff still loads before hashline-edit-pro).
 - Add `config` entries `advisor-watchdog` and `vision-config` that install `WATCHDOG.yml` and `vision.json` into the agent root (backup on overwrite), mirroring the maintainer's device configuration.
-- Presets follow the live personalization: `base` also sets `defaultTools` to `+codemode`/`+tool_search`; `ui` adds token-speed and the stats dashboard, follows the `system` theme (Vesper files stay available, not activated) and syncs `zentui.json` including the footer token-speed placement and visibility; `workflow` drops `web-access` and its `web-search` file entry.
+- Presets follow the live personalization: `base` also sets `defaultTools` to `+codemode`/`+tool_search` and installs `mcp.json` (copy, with the `cua` entry in portable `~/`/`${HOME}` form); `ui` adds token-speed and the stats dashboard, follows the `system` theme (Vesper files stay available, not activated) and syncs `zentui.json` including the footer token-speed placement and visibility; `workflow` drops `web-access` and its `web-search` file entry.
+- Add the `models` preset: the full provider catalog for the local CPA proxy ships via `merge-models` with every `apiKey` replaced by the `$CPA_API_KEY` environment reference (never literal credentials), plus the device's default provider and model.
 
 ## [0.6.4](https://github.com/robzolkos/LazyPi/compare/v0.6.3...v0.6.4) (2026-07-27)
 
