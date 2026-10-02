@@ -25,6 +25,7 @@ test("aggregates sessions, forks, transcripts, tools and warnings", async () => 
   assert.equal(out.by.tool.bash.requests, 1);
   assert.deepEqual(out.errors, [["HTTP 502", 1]]);
   assert.equal(out.totals.all.errors, 1);
+  assert.equal(out.hours[String(new Date().getHours())].requests, 4);
 });
 
 test("errorType buckets raw provider messages", () => {
