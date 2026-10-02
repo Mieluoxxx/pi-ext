@@ -60,8 +60,8 @@ Use `pi update <source>` when updating one extension directly.
 Run the local suite with:
 
 ```bash
-npm ci
-npm test
+pnpm install
+pnpm test
 node scripts/packed-cli-smoke.mjs
 ```
 

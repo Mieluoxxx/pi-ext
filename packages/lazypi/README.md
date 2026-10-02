@@ -155,18 +155,17 @@ Restart Pi after applying; not all extension settings support hot reload. If `PI
 Fork the repository on GitHub, then:
 
 ```bash
-git clone git@github.com:<your-user>/LazyPi.git
-cd LazyPi
-npm ci
+git clone git@github.com:Mieluoxxx/pi-ext.git
+cd pi-ext/packages/lazypi
+pnpm install
 ```
 
 ### 2. Rename the npm package
 
-The CLI reads its package name from `package.json`, so help and error messages pick it up with no second edit. Keep the name in `package-lock.json` in sync too:
+The CLI reads its package name from `package.json`, so help and error messages pick it up with no second edit:
 
 ```bash
 npm pkg set name=@<your-npm-user>/lazypi
-npm install --package-lock-only
 ```
 
 ### 3. Replace the catalog
@@ -207,7 +206,7 @@ Categories are derived automatically from the `category` values, so adding a new
 ### 4. Test before publishing
 
 ```bash
-npm test
+pnpm test
 node scripts/packed-cli-smoke.mjs
 npm pack --dry-run
 ```
@@ -225,15 +224,13 @@ Do not rely on `--local` for full isolation: theme and agent-file entries are al
 
 ### 5. Publish
 
-The first release is a manual npm publish. Scoped packages default to private, so publish with public access unless your npm account supports private packages:
+This package lives at `packages/lazypi` in the [pi-ext](https://github.com/Mieluoxxx/pi-ext) workspace and is published from that workspace root. There is no release automation: bump `version` with the change and publish deliberately.
 
 ```bash
-npm publish --access public
+pnpm --filter @moguw/lazypi publish
 ```
 
-After that, the repository's Release Please workflow ([`.github/workflows/release-please.yml`](.github/workflows/release-please.yml)) takes over: conventional commits on your default branch open release PRs, and npm trusted publishing handles authentication with `--provenance`.
-
-**Fork owners:** check the branch filters in `.github/workflows/test.yml` and `.github/workflows/release-please.yml`. This repository's default branch is `main`, but those workflows currently trigger on `master` — update them to your own default branch, or CI will never run.
+Version numbering continues the series already on npm under `@moguw` (currently `0.5.0`); the `0.6.x` entries in `CHANGELOG.md` predate the fork.
 
 ## Maintain the catalog
 
@@ -242,7 +239,7 @@ A normal maintenance pass looks like this:
 1. Run `pi list` and compare the installed sources against `PACKAGES`.
 2. Add entries only for extensions you actually use; remove entries you no longer want installed.
 3. For a new file-based entry, drop the file under `themes/` or `agent/` and reference it from the entry.
-4. Run `npm test` and `node scripts/packed-cli-smoke.mjs`, then `node bin/lazypi.mjs status` to eyeball the catalog.
+4. Run `pnpm test` and `node scripts/packed-cli-smoke.mjs`, then `node bin/lazypi.mjs status` to eyeball the catalog.
 5. Commit with Conventional Commits, for example `feat: add extension to catalog` or `fix: preserve custom Pi settings`.
 
 Two different update paths, and they do not overlap:
@@ -254,6 +251,8 @@ Existing files are never silently destroyed. Before a settings file or an instal
 
 ## Repository layout
 
+Paths are relative to `packages/lazypi` in the pi-ext workspace.
+
 ```
 bin/lazypi.mjs          CLI and the PACKAGES catalog (the source of truth)
 lib/presets.mjs         preset validation, merging, planning and safe writes
@@ -262,7 +261,6 @@ themes/                 theme JSON files referenced by themes entries
 agent/                  agent config files referenced by config entries (e.g. AGENTS.md)
 test/                   node:test suite (catalog, load order, post-install, themes, CLI)
 scripts/                packed-cli-smoke and installed-package assertion helpers
-.github/workflows/      CI: test, windows-smoke, release-please
 ```
 
 ## Safety and behavior
@@ -275,12 +273,12 @@ scripts/                packed-cli-smoke and installed-package assertion helpers
 
 ## Development
 
-The LazyPi CLI requires Node.js 20.12 or newer. The full extension set includes packages requiring Node.js 22.19 or newer; CI uses Node.js 24. npm and Pi are needed for real install-flow checks.
+The LazyPi CLI requires Node.js 20.12 or newer. The full extension set includes packages requiring Node.js 22.19 or newer. npm and Pi are needed for real install-flow checks.
 
 ```bash
-npm ci
-npm test
+pnpm install
+pnpm test
 node scripts/packed-cli-smoke.mjs
 ```
 
-The packed smoke test inspects the published file list, invokes the npm artifact's binary, and applies a built-in plus external preset twice in an isolated HOME/agent directory, checking preservation, backups, idempotence and status. The CI workflows install Pi, run the full suite, run the packed smoke test, and assert that a full `lazypi --yes` install matches the catalog.
+The packed smoke test inspects the published file list, invokes the npm artifact's binary, and applies a built-in plus external preset twice in an isolated HOME/agent directory, checking preservation, backups, idempotence and status. `scripts/assert-installed-packages.mjs --check-status` asserts that a full `lazypi --yes` install matches the catalog.

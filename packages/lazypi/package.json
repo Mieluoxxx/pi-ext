@@ -4,6 +4,16 @@
   "description": "Template Pi extension manager and catalog installer.",
   "license": "MIT",
   "type": "module",
+  "private": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mieluoxxx/pi-ext.git",
+    "directory": "packages/lazypi"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "bin": {
     "lazypi": "bin/lazypi.mjs"
   },

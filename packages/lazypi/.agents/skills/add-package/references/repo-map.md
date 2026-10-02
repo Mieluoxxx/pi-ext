@@ -16,13 +16,9 @@ Important structures:
 
 When adding a package, inspect whether similar packages are grouped together and keep the local ordering/style.
 
-## CI
+## Verification
 
-### `.github/workflows/test.yml`
-
-This workflow installs LazyPi and asserts that expected package sources appear in Pi's `settings.json`.
-
-If you add a package to the default LazyPi catalog, inspect whether the workflow's expected package list must be updated as well.
+There is no CI in this repository. The suite runs with `pnpm test`, and `scripts/assert-installed-packages.mjs` derives its expectations from `PACKAGES`, so a new catalog entry needs no assertion update.
 
 ## Public docs
 
@@ -100,7 +96,7 @@ The key requirement is consistency with the repo as it exists now.
 1. Inspect upstream package docs.
 2. Add a `PACKAGES` entry in `bin/lazypi.mjs`.
 3. Decide whether special install logic is needed.
-4. Update `.github/workflows/test.yml` if the package is part of the default installed catalog.
+4. Run `pnpm test`; catalog assertions derive from `PACKAGES` automatically.
 5. Decide the right documentation surface.
 6. Update duplicated navigation where required.
 7. Search for stale counts like `23` or theme totals.

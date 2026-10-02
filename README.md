@@ -20,6 +20,7 @@
 | `pi-openai-tools` | 上下文窗口、远程压缩 v2、图像生成/编辑、Astra 兼容及 apply_patch；不含托管搜索或 auto 审查 | [awoaCrim/pi-openai-toolkit](https://github.com/awoaCrim/pi-openai-toolkit) v0.14.5 源码快照（无 Git 元数据）；[code-yeongyu/pi-apply-patch](https://github.com/code-yeongyu/pi-apply-patch) @ `8f0d8a6` |
 | `pi-advisor` | 独立 advisor 咨询：稳定缓存前缀、费用计量、预算和锚点裁剪、按收益保活；同模型直接禁用 | 派生自 [juicesharp/rpiv-mono](https://github.com/juicesharp/rpiv-mono) 的 rpiv-advisor 2.11.0；[包文档](extensions/pi-advisor/README.md) |
 | `pi-stats-dashboard` | 本地 `/stats` 用量面板：扫描持久化会话 JSONL，聚合 lifetime/today/7d/30d 令牌、费用及模型/项目/工具分布，并统计用户消息行为信号 | [suryavamsi6/pi-stats-dashboard](https://github.com/suryavamsi6/pi-stats-dashboard) @ `3ee97be`（v0.1.3 + HEAD 未发布的 token 分类展示改动） |
+| `@moguw/lazypi` | 扩展管理 CLI（非扩展包，位于 `packages/lazypi`）：按 `PACKAGES` 目录安装、审计、更新、移除扩展，并用可组合预设写入 agent 配置 | 本仓库 `packages/lazypi`，源自作者 fork 的 [Mieluoxxx/LazyPi](https://github.com/Mieluoxxx/LazyPi) |
 
 ## 🧑‍💻 本地开发
 
@@ -43,10 +44,21 @@ pi -e ./extensions/pi-stats-dashboard
 
 `pi-openai-tools` 的配置、默认关闭项与迁移步骤见[包文档](extensions/pi-openai-tools/README.md)。使用前先移除或禁用独立 `git:github.com/code-yeongyu/pi-apply-patch`，再按文档安装本地包，避免同名工具冲突；本仓库不会自动安装或启用它。
 
+`lazypi` 是 workspace 里的管理 CLI，发布为 `@moguw/lazypi`，不在 `pi -e` 试用范围内：
+
+```bash
+node packages/lazypi/bin/lazypi.mjs --help
+pnpm --filter @moguw/lazypi test
+pnpm --filter @moguw/lazypi publish
+```
+
+发布走 `pnpm --filter @moguw/lazypi publish`（手工，版本号延续 npm 上的 `0.5.0`）；`packages/lazypi` 的历史来自独立 LazyPi 仓库，其 `CHANGELOG.md` 中 `0.6.x` 及更早条目属于 fork 前的上游发布记录。
+
 ## 🗂️ 仓库结构
 
 ```text
 extensions/   独立发布的生产级 Pi 扩展
+packages/     非扩展包（目前只有 @moguw/lazypi 管理 CLI）
 ```
 
 每个扩展自带包元数据、文档、测试以及显式的 Pi 入口。大多数扩展使用精简的 `src/index.ts`；`pi-interactive-shell` 保持了与其上游一致的扁平模块布局。

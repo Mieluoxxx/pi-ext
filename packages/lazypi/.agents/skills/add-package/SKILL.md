@@ -32,8 +32,8 @@ That means you must do more than just append a package object. You need to inspe
 Always read these files first:
 
 - `bin/lazypi.mjs`
+- `lib/presets.mjs`
 - `README.md`
-- `.github/workflows/test.yml`
 - `docs/docs/index.html`
 - `docs/docs/packages/index.html`
 - `docs/themes.html`
@@ -153,11 +153,10 @@ If the new docs page is user-facing, update all places that should link to it.
 
 This repo uses hand-authored static HTML, so navigation is duplicated across files. Do not assume there is a generator.
 
-Also inspect CI. The GitHub Actions workflow may assert that specific default package sources are installed, so adding a package to the default LazyPi catalog may require updating workflow expectations.
+This repository has no CI. Verify locally with `pnpm test` (from `packages/lazypi`, or `pnpm run check` from the pi-ext workspace root).
 
 Check and update as needed:
 
-- `.github/workflows/test.yml`
 - `docs/docs/packages/index.html`
 - sidebars in docs pages that list package pages
 - `docs/docs/index.html`
@@ -172,7 +171,7 @@ At minimum:
 - search for outdated package counts or stale navigation
 - verify the new slug/path is linked correctly
 - verify formatting in `bin/lazypi.mjs` matches surrounding entries
-- verify `.github/workflows/test.yml` still reflects the default installed catalog when applicable
+- verify `pnpm test` passes and that no README catalog or package count went stale
 - verify the package category and source are defensible
 - call out any uncertainty about pins, categories, or whether a package should have a dedicated page
 
