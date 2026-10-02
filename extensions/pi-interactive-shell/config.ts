@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import type { KeyId, OverlayAnchor } from "@earendil-works/pi-tui";
+import { compileLaunchPolicy, type LaunchPolicy } from "./launch-policy.ts";
 
 /** A spawn agent is any key configured in `spawn.commands`, including the built-in defaults. */
 export type SpawnAgent = string;
@@ -42,6 +43,8 @@ export interface InteractiveShellConfig {
 	handsFreeUpdateMaxChars: number;
 	handsFreeMaxTotalChars: number;
 	minQueryIntervalSeconds: number;
+	/** Present only when the user's global config defines `launchPolicy`. */
+	launchPolicy?: LaunchPolicy;
 }
 
 const DEFAULT_SPAWN_CONFIG: SpawnConfig = {
@@ -169,7 +172,19 @@ export function loadConfig(cwd: string): InteractiveShellConfig {
 			5,
 			300,
 		),
+		launchPolicy: resolveLaunchPolicy(globalConfig, projectConfig),
 	};
+}
+
+/** A repository must not be able to allow launches the user has not approved. */
+function resolveLaunchPolicy(globalConfig: Record<string, unknown>, projectConfig: Record<string, unknown>): LaunchPolicy | undefined {
+	if (projectConfig.launchPolicy !== undefined) throw new Error("Project config cannot define launchPolicy; it is global-only.");
+	if (globalConfig.launchPolicy === undefined) return undefined;
+	try {
+		return compileLaunchPolicy(globalConfig.launchPolicy);
+	} catch (error) {
+		throw new Error(`Invalid global launchPolicy: ${error instanceof Error ? error.message : "invalid rules"}`);
+	}
 }
 
 function loadConfigObject(path: string): Record<string, unknown> {
