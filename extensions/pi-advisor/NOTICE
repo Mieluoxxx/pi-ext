@@ -1,0 +1,9 @@
+pi-advisor is derived from @juicesharp/rpiv-advisor 2.11.0 in
+https://github.com/juicesharp/rpiv-mono (MIT, Copyright 2026 juicesharp).
+Source base commit: d74b1c99830a565f3df3f37e0a36616d17ffc574.
+The local source snapshot includes the advisor caching, cost, context-anchor,
+warming, and same-model suppression changes made on 2026-09-28.
+
+advisor/settings.ts and test helpers are adapted from that project's
+rpiv-config and test-utils. The original MIT copyright and permission notice
+are retained in LICENSE. Modifications and standalone packaging: moguw.

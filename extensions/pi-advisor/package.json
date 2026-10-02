@@ -1,0 +1,76 @@
+{
+  "name": "@moguw/pi-advisor",
+  "version": "0.2.0",
+  "description": "Pi extension. A second opinion the model can request from a stronger reviewer model before it acts.",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "advisor"
+  ],
+  "type": "module",
+  "license": "MIT",
+  "author": "moguw",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "check": "pnpm run typecheck && pnpm run test",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "usage": "node scripts/advisor-usage-baseline.mjs"
+  },
+  "files": [
+    "index.ts",
+    "advisor/",
+    "advisor-ui.ts",
+    "fuzzy.ts",
+    "prompts/",
+    "docs/",
+    "!docs/*.png",
+    "!docs/*.jpg",
+    "!docs/*.svg",
+    "README.md",
+    "LICENSE",
+    "!**/*.test.ts",
+    "scripts/",
+    "CHANGELOG.md",
+    "NOTICE"
+  ],
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": ">=0.80.6",
+    "@earendil-works/pi-coding-agent": ">=0.80.6",
+    "@earendil-works/pi-tui": ">=0.80.6",
+    "typebox": "*"
+  },
+  "contributors": [
+    "juicesharp"
+  ],
+  "main": "index.ts",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-ai": "1.0.0",
+    "@earendil-works/pi-coding-agent": "1.0.0",
+    "@earendil-works/pi-tui": "1.0.0",
+    "@types/node": "22.20.1",
+    "typebox": "^1.1.38",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mieluoxxx/pi-ext.git",
+    "directory": "extensions/pi-advisor"
+  },
+  "homepage": "https://github.com/Mieluoxxx/pi-ext/tree/main/extensions/pi-advisor#readme",
+  "bugs": {
+    "url": "https://github.com/Mieluoxxx/pi-ext/issues"
+  }
+}
