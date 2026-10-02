@@ -11,6 +11,18 @@ function add(a, u, error = false) { const input=+u.input||0, output=+u.output||0
 function idHash(x) { return createHash("sha1").update(JSON.stringify([x.type ?? x.recordType, x.id ?? x.toolCallId, x.timestamp ?? x.ts, x.message?.usage ?? x.usage])).digest("hex"); }
 async function walk(dir) { let out=[]; try { for (const e of await readdir(dir,{withFileTypes:true})) { const p=join(dir,e.name); if(e.isDirectory()) out=out.concat(await walk(p)); else if(e.name.endsWith(".jsonl")) out.push(p); } } catch {} return out; }
 function projectOf(file) { const rel=relative(sessionsRoot,file).split("/"); return rel[0] ? rel[0].replace(/^-+/g,"/").replace(/-/g,"/") : "unknown"; }
+// 归一化错误信息为可统计的类型桶
+export function errorType(msg) {
+  const s = String(msg ?? "");
+  if (/abort|terminated/i.test(s)) return "Aborted / terminated";
+  if (/timed? ?out|timeout/i.test(s)) return "Timeout";
+  if (/context/i.test(s)) return "Context too large";
+  const code = s.match(/\b([45]\d{2})\b/);
+  if (code) return `HTTP ${code[1]}`;
+  if (/stream/i.test(s)) return "Stream interrupted";
+  if (/connection/i.test(s)) return "Connection error";
+  return s.split(/[:\n]/)[0].trim().slice(0, 60) || "Unknown";
+}
 function emptyGroup() { return new Map(); }
 function userText(content) {
   if (typeof content === "string") return content;
@@ -18,9 +30,9 @@ function userText(content) {
   return content.map(part => typeof part === "string" ? part : part?.type === "text" ? part.text : "").filter(Boolean).join("\n");
 }
 export async function aggregate(root=sessionsRoot, now=Date.now()) {
-  const files=await walk(root), seen=new Set(), seenTools=new Set(), all=zero(), ranges={all:zero(),today:zero(),week:zero(),month:zero()}, groups={model:emptyGroup(),provider:emptyGroup(),project:emptyGroup(),agent:emptyGroup(),tool:emptyGroup()}, days=new Map(), behavior={messages:0,chars:0,words:0,yelling:0,profanity:0,anguish:0,negation:0,repetition:0,blame:0}, diagnostics={files:files.length,invalidLines:0,skippedRecords:0,standardSessions:0,transcriptFiles:0};
+  const files=await walk(root), seen=new Set(), seenTools=new Set(), all=zero(), ranges={all:zero(),today:zero(),week:zero(),month:zero()}, groups={model:emptyGroup(),provider:emptyGroup(),project:emptyGroup(),agent:emptyGroup(),tool:emptyGroup()}, days=new Map(), errors=new Map(), behavior={messages:0,chars:0,words:0,yelling:0,profanity:0,anguish:0,negation:0,repetition:0,blame:0}, diagnostics={files:files.length,invalidLines:0,skippedRecords:0,standardSessions:0,transcriptFiles:0};
   const midnight=new Date(); midnight.setHours(0,0,0,0); const cutoffs={today:midnight.getTime(),week:midnight.getTime()-6*86400000,month:midnight.getTime()-29*86400000};
-  function request(m, meta) { const ts=Number(m.timestamp)||meta.timestamp||0, u=m.usage; if(!u || typeof u!=="object") {diagnostics.skippedRecords++;return} const item={provider:m.provider,model:m.model,agent:meta.agent,project:meta.project,tool:meta.tool,timestamp:ts}; const sig=idHash({type:"message",id:meta.id,timestamp:ts,message:{usage:u}}); if(seen.has(sig))return; seen.add(sig); add(all,u,m.stopReason==="error"); const groupKeys={model:key(m),provider:m.provider??"unknown",project:meta.project,agent:meta.agent}; for(const [kind,k] of Object.entries(groupKeys)){const g=groups[kind].get(k)||zero();add(g,u,m.stopReason==="error");groups[kind].set(k,g)} const day=new Date(ts).toISOString().slice(0,10), d=days.get(day)||zero();add(d,u,m.stopReason==="error");days.set(day,d);for(const [name,cut] of Object.entries(cutoffs))if(ts>=cut)add(ranges[name],u,m.stopReason==="error"); }
+  function request(m, meta) { const ts=Number(m.timestamp)||meta.timestamp||0, u=m.usage; if(!u || typeof u!=="object") {diagnostics.skippedRecords++;return} const item={provider:m.provider,model:m.model,agent:meta.agent,project:meta.project,tool:meta.tool,timestamp:ts}; const sig=idHash({type:"message",id:meta.id,timestamp:ts,message:{usage:u}}); if(seen.has(sig))return; seen.add(sig); add(all,u,m.stopReason==="error"); if(m.stopReason==="error"){const t=errorType(m.errorMessage??m.error);errors.set(t,(errors.get(t)??0)+1)} const groupKeys={model:key(m),provider:m.provider??"unknown",project:meta.project,agent:meta.agent}; for(const [kind,k] of Object.entries(groupKeys)){const g=groups[kind].get(k)||zero();add(g,u,m.stopReason==="error");groups[kind].set(k,g)} const day=new Date(ts).toISOString().slice(0,10), d=days.get(day)||zero();add(d,u,m.stopReason==="error");days.set(day,d);for(const [name,cut] of Object.entries(cutoffs))if(ts>=cut)add(ranges[name],u,m.stopReason==="error"); }
   for(const file of files) { const text=await readFile(file,"utf8"); const standard=text.split("\n").some(l=>{try{return JSON.parse(l).type==="session"}catch{return false}}); if(standard) diagnostics.standardSessions++; else diagnostics.transcriptFiles++;
     let lastModel={}; for(const line of text.split("\n")){if(!line.trim())continue;let x;try{x=JSON.parse(line)}catch{diagnostics.invalidLines++;continue} const meta={id:x.id, timestamp:Date.parse(x.timestamp)||0, project:projectOf(file), agent:standard?"main":basename(file).split("_")[0]||"subagent"};
       if(standard && x.type==="message"){const m=x.message;if(m?.role==="user"){const text=userText(m.content);const b=computeBehavior(text);for(const k of Object.keys(b))behavior[k]=(behavior[k]||0)+b[k];behavior.messages++} if(m?.role==="assistant"){lastModel={provider:m.provider,model:m.model};request(m,meta);for(const c of Array.isArray(m.content)?m.content:[])if(c?.type==="toolCall"&&!seenTools.has(`${meta.id}:${c.id}`)){seenTools.add(`${meta.id}:${c.id}`);const g=groups.tool.get(c.name)||zero();g.requests++;groups.tool.set(c.name,g)}} if(m?.role==="toolResult"&&m.usage)request({...m,...lastModel}, {...meta,tool:m.toolName||"nested"});}
@@ -28,5 +40,5 @@ export async function aggregate(root=sessionsRoot, now=Date.now()) {
       else if(!standard && x.recordType==="message" && x.role==="assistant")request(x,meta);
     }
   }
-  ranges.all={...all}; return {generatedAt:now, totals:{all,...all}, ranges, by:{model:Object.fromEntries(groups.model),provider:Object.fromEntries(groups.provider),project:Object.fromEntries(groups.project),agent:Object.fromEntries(groups.agent),tool:Object.fromEntries(groups.tool)}, days:Object.fromEntries([...days].sort()), behavior, diagnostics};
+  ranges.all={...all}; return {generatedAt:now, totals:{all,...all}, ranges, by:{model:Object.fromEntries(groups.model),provider:Object.fromEntries(groups.provider),project:Object.fromEntries(groups.project),agent:Object.fromEntries(groups.agent),tool:Object.fromEntries(groups.tool)}, days:Object.fromEntries([...days].sort()), errors:[...errors.entries()].sort((a,b)=>b[1]-a[1]), behavior, diagnostics};
 }
