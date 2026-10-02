@@ -37,6 +37,8 @@ const baseConfig = {
 
 async function setupHarness(defer: boolean, dynamicApis = true, allowedTools = ["interactive_shell", "enable_interactive_shell"]) {
 	vi.resetModules();
+	Reflect.deleteProperty(globalThis, "__piInteractiveShellCoordinatorV1");
+	const killAll = vi.fn();
 	vi.doMock("@earendil-works/pi-coding-agent", () => ({
 		getAgentDir: () => "/tmp/pi-agent",
 		getShellConfig: () => ({ shell: "/bin/bash", args: ["-c"] }),
@@ -59,11 +61,12 @@ async function setupHarness(defer: boolean, dynamicApis = true, allowedTools = [
 	vi.doMock("../background-widget.ts", () => ({ setupBackgroundWidget: () => () => {} }));
 	vi.doMock("../session-manager.ts", () => ({
 		sessionManager: {
-			killAll: vi.fn(),
+			killAll,
 			onChange: vi.fn(() => () => {}),
 			list: vi.fn(() => []),
 		},
 		generateSessionId: () => "test-session",
+		releaseSessionManagerSingleton: vi.fn(),
 	}));
 
 	const { default: extension } = await import("../index.ts");
@@ -90,7 +93,7 @@ async function setupHarness(defer: boolean, dynamicApis = true, allowedTools = [
 	}
 
 	extension(pi as any);
-	return { pi, tools, handlers, getActiveTools: () => activeTools, setActiveTools };
+	return { pi, tools, handlers, getActiveTools: () => activeTools, setActiveTools, killAll };
 }
 
 const sessionContext = {
@@ -120,6 +123,17 @@ describe("deferred interactive_shell loading", () => {
 		expect([...harness.tools.keys()]).toEqual(["interactive_shell"]);
 		expect(harness.tools.get("interactive_shell").promptSnippet).toContain("submit=true");
 		expect(harness.setActiveTools).not.toHaveBeenCalled();
+	});
+
+	it("preserves background sessions on reload but terminates them on quit", async () => {
+		const harness = await setupHarness(false);
+		const shutdown = harness.handlers.get("session_shutdown");
+
+		shutdown({ reason: "reload" });
+		expect(harness.killAll).not.toHaveBeenCalled();
+
+		shutdown({ reason: "quit" });
+		expect(harness.killAll).toHaveBeenCalledOnce();
 	});
 
 	it("starts deferred sessions with only the loader and re-enables the tool additively", async () => {

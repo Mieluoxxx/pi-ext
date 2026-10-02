@@ -6,7 +6,7 @@ import { join } from "node:path";
 describe("real monitor lifecycle", () => {
 	let root: string;
 	let tool: any;
-	let shutdown: (() => void) | undefined;
+	let shutdown: ((event: { reason: string }) => void) | undefined;
 	let messages: any[];
 	const command = (script: string) => `${JSON.stringify(process.execPath)} -e '${script.replaceAll("'", "'\\''")}'`;
 	const call = (params: unknown) => tool.execute("fixture", params, undefined, undefined, { cwd: root, hasUI: false, ui: {} });
@@ -24,13 +24,13 @@ describe("real monitor lifecycle", () => {
 		extension({
 			registerTool(definition: any) { if (definition.name === "interactive_shell") tool = definition; },
 			registerCommand() {}, registerShortcut() {},
-			on(name: string, handler: () => void) { if (name === "session_shutdown") shutdown = handler; },
+			on(name: string, handler: (event: { reason: string }) => void) { if (name === "session_shutdown") shutdown = handler; },
 			events: { emit() {} }, sendMessage(message: unknown) { messages.push(message); },
 		} as any);
 	});
 
 	afterEach(() => {
-		shutdown?.();
+		shutdown?.({ reason: "quit" });
 		vi.doUnmock("@earendil-works/pi-coding-agent");
 		rmSync(root, { recursive: true, force: true });
 	});

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ShellSessionManager, type ActiveSession } from "../session-manager.ts";
+import { sessionManager, ShellSessionManager, type ActiveSession } from "../session-manager.ts";
 
 function createSession() {
 	return {
@@ -27,6 +27,17 @@ function createActiveSession(dispose: () => void): ActiveSession {
 }
 
 describe("ShellSessionManager", () => {
+	it("reuses the process-wide manager when extension modules reload", async () => {
+		vi.resetModules();
+		const reloaded = await import("../session-manager.ts");
+		expect(reloaded.sessionManager).toBe(sessionManager);
+
+		reloaded.releaseSessionManagerSingleton(reloaded.sessionManager);
+		vi.resetModules();
+		const replacement = await import("../session-manager.ts");
+		expect(replacement.sessionManager).not.toBe(sessionManager);
+	});
+
 	beforeEach(() => {
 		vi.useFakeTimers();
 	});
