@@ -600,7 +600,7 @@ function registerHeadlessActive(
 			}
 			const liveMonitor = coordinator.getMonitor(id);
 			if (liveMonitor && !liveMonitor.disposed) {
-				session.kill();
+				liveMonitor.kill();
 				return;
 			}
 			coordinator.disposeMonitor(id);
@@ -1350,6 +1350,7 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 					const status = session.getStatus();
 					const runtime = session.getRuntime();
 					session.kill();
+					session.dispose?.();
 					sessionManager.unregisterActive(sessionId, true);
 
 					const truncatedNote = truncated ? ` (${totalBytes} bytes total, truncated)` : "";
@@ -1381,7 +1382,9 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 							details: { sessionId },
 						};
 					}
-					sessionManager.unregisterActive(sessionId, false);
+					if (!session.retainAfterCompletion) {
+						sessionManager.unregisterActive(sessionId, false);
+					}
 					return {
 						content: [{ type: "text", text: `Session backgrounded (id: ${result.backgroundId})` }],
 						details: { sessionId, backgroundId: result.backgroundId, ...result },
@@ -1440,7 +1443,9 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 						const truncatedNote = truncated ? ` (${totalBytes} bytes total, truncated)` : "";
 						const hasOutput = output.length > 0;
 						const hasMoreNote = hasMore === true ? " (more available)" : "";
-						sessionManager.unregisterActive(sessionId, !result.backgrounded);
+						if (!session.retainAfterCompletion) {
+							sessionManager.unregisterActive(sessionId, !result.backgrounded);
+						}
 						return {
 							content: [{ type: "text", text: `Session ${sessionId} ${status} after ${formatDurationMs(runtime)}${hasOutput ? `\n\nOutput${truncatedNote}${hasMoreNote}:\n${output}` : ""}` }],
 							details: { sessionId, status, runtime, output, outputTruncated: truncated, outputTotalBytes: totalBytes, outputTotalLines: totalLines, hasMore, exitCode: result.exitCode, signal: result.signal, backgroundId: result.backgroundId },
@@ -1469,7 +1474,9 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 							const hasOutput = output.length > 0;
 							const hasMoreNote = hasMore === true ? " (more available)" : "";
 							if (earlyResult) {
-								sessionManager.unregisterActive(sessionId, !earlyResult.backgrounded);
+								if (!earlySession.retainAfterCompletion) {
+									sessionManager.unregisterActive(sessionId, !earlyResult.backgrounded);
+								}
 								return {
 									content: [{ type: "text", text: `Session ${sessionId} ${earlyStatus} after ${formatDurationMs(earlyRuntime)}${hasOutput ? `\n\nOutput${truncatedNote}${hasMoreNote}:\n${output}` : ""}` }],
 									details: { sessionId, status: earlyStatus, runtime: earlyRuntime, output, outputTruncated: truncated, outputTotalBytes: totalBytes, outputTotalLines: totalLines, hasMore, exitCode: earlyResult.exitCode, signal: earlyResult.signal, backgroundId: earlyResult.backgroundId },
@@ -1489,7 +1496,9 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 						const freshRuntime = session.getRuntime();
 						const freshResult = session.getResult();
 						if (freshResult) {
-							sessionManager.unregisterActive(sessionId, !freshResult.backgrounded);
+							if (!session.retainAfterCompletion) {
+								sessionManager.unregisterActive(sessionId, !freshResult.backgrounded);
+							}
 							return {
 								content: [{ type: "text", text: `Session ${sessionId} ${freshStatus} after ${formatDurationMs(freshRuntime)}${hasOutput ? `\n\nOutput${truncatedNote}${hasMoreNote}:\n${freshOutput.output}` : ""}` }],
 								details: { sessionId, status: freshStatus, runtime: freshRuntime, output: freshOutput.output, outputTruncated: freshOutput.truncated, outputTotalBytes: freshOutput.totalBytes, outputTotalLines: freshOutput.totalLines, hasMore: freshOutput.hasMore, exitCode: freshResult.exitCode, signal: freshResult.signal, backgroundId: freshResult.backgroundId },
@@ -1977,18 +1986,19 @@ function setupDispatchCompletion(
 					customType: "interactive-shell-transfer",
 					content,
 					display: true,
-					details: { sessionId: id, exitCode: result.exitCode, signal: result.signal, timedOut: result.timedOut, cancelled: result.cancelled, completionOutput: result.completionOutput },
+					details: { sessionId: id, exitCode: result.exitCode, signal: result.signal, completionReason: result.completionReason, timedOut: result.timedOut, cancelled: result.cancelled, completionOutput: result.completionOutput },
 				}, { triggerTurn: true });
 			}
 			pi.events.emit("interactive-shell:transfer", {
 				sessionId: id,
+				completionReason: result.completionReason,
 				completionOutput: result.completionOutput,
 				exitCode: result.exitCode,
 				signal: result.signal,
 				timedOut: result.timedOut,
 				cancelled: result.cancelled,
 			});
-			sessionManager.unregisterActive(id, true);
+			sessionManager.scheduleCleanup(id, 5 * 60 * 1000);
 			coordinator.disposeMonitor(id);
 			return;
 		}

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ShellSessionManager } from "../session-manager.ts";
+import { ShellSessionManager, type ActiveSession } from "../session-manager.ts";
 
 function createSession() {
 	return {
@@ -7,6 +7,22 @@ function createSession() {
 		setEventHandlers: vi.fn(),
 		dispose: vi.fn(),
 		kill: vi.fn(),
+	};
+}
+
+function createActiveSession(dispose: () => void): ActiveSession {
+	return {
+		id: "active-1",
+		command: "pi \"active\"",
+		write: vi.fn(),
+		kill: vi.fn(),
+		background: vi.fn(),
+		getOutput: vi.fn() as any,
+		getStatus: vi.fn() as any,
+		getRuntime: vi.fn() as any,
+		getResult: vi.fn() as any,
+		dispose,
+		onComplete: vi.fn(),
 	};
 }
 
@@ -63,5 +79,37 @@ describe("ShellSessionManager", () => {
 		manager.killAll();
 		expect(backgroundSession.dispose).toHaveBeenCalledTimes(1);
 		expect(activeKill).toHaveBeenCalledTimes(1);
+	});
+
+	it("disposes retained active sessions on scheduled cleanup", () => {
+		const manager = new ShellSessionManager();
+		const dispose = vi.fn();
+		manager.registerActive(createActiveSession(dispose));
+		manager.scheduleCleanup("active-1", 5 * 60 * 1000);
+
+		vi.advanceTimersByTime(5 * 60 * 1000);
+
+		expect(dispose).toHaveBeenCalledTimes(1);
+		expect(manager.getActive("active-1")).toBeUndefined();
+	});
+
+	it("cancels stale active cleanup on unregister or replacement", () => {
+		const manager = new ShellSessionManager();
+		const staleDispose = vi.fn();
+		const nextDispose = vi.fn();
+
+		manager.registerActive(createActiveSession(staleDispose));
+		manager.scheduleCleanup("active-1", 1000);
+		manager.unregisterActive("active-1");
+		vi.advanceTimersByTime(1000);
+		expect(staleDispose).not.toHaveBeenCalled();
+
+		manager.registerActive(createActiveSession(staleDispose));
+		manager.scheduleCleanup("active-1", 1000);
+		manager.registerActive({ ...createActiveSession(nextDispose), command: "pi \"next\"" });
+		vi.advanceTimersByTime(1000);
+		expect(staleDispose).not.toHaveBeenCalled();
+		expect(nextDispose).not.toHaveBeenCalled();
+		expect(manager.getActive("active-1")).toBeDefined();
 	});
 });

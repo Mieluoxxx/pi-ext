@@ -119,7 +119,7 @@ export const toolParameters = Type.Object({
 		gracePeriod: Type.Optional(Type.Integer({ minimum: 0, description: "Startup grace (default: 15000ms)." })),
 		updateMaxChars: Type.Optional(Type.Integer({ minimum: 1 })),
 		maxTotalChars: Type.Optional(Type.Integer({ minimum: 1 })),
-		autoExitOnQuiet: Type.Optional(Type.Boolean()),
+		autoExitOnQuiet: Type.Optional(Type.Boolean({ description: "Auto-close after quiet. Defaults to true in dispatch mode and false in hands-free mode." })),
 	}, { additionalProperties: false })),
 	handoffPreview: Type.Optional(Type.Object({
 		enabled: Type.Optional(Type.Boolean()),

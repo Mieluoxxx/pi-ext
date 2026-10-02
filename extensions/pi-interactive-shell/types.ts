@@ -3,9 +3,13 @@
  */
 import type { ToolParams } from "./tool-schema.ts";
 
+/** Why a dispatch session ended. `auto-close-quiet` is not a command verdict. */
+export type DispatchCompletionReason = "exited" | "timed-out" | "killed" | "auto-close-quiet";
+
 export interface InteractiveShellResult {
 	exitCode: number | null;
 	signal?: number;
+	completionReason?: DispatchCompletionReason;
 	backgrounded: boolean;
 	backgroundId?: string;
 	cancelled: boolean;
