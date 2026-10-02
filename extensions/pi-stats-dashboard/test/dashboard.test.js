@@ -25,5 +25,6 @@ test("abbreviates large counts with K/M/B units", () => {
 test("layout keeps panels shrinkable instead of overflowing their container", () => {
   assert.ok(!html.includes("min-width: 850px"), "table must not force a fixed 850px width");
   assert.ok(html.includes("grid-template-columns: minmax(0, 1fr)"), "stat-list must clamp its implicit column");
-  assert.ok(html.includes(".stat-line .name { flex: 1 1 auto; min-width: 0;"), "stat-line name must be allowed to shrink");
+  assert.ok(html.includes(".legend .name { flex: 1 1 auto; min-width: 0;"), "legend name must be allowed to shrink");
+  assert.ok(html.includes(".grid.trio { grid-template-columns: repeat(3, minmax(0, 1fr)); }"), "trio panels must clamp their columns");
 });
