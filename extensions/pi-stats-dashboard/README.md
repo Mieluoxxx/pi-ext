@@ -6,7 +6,7 @@ A local, privacy-first `/stats` dashboard for [Pi](https://pi.dev). It reads Pi'
 
 > Vendored into [Mieluoxxx/pi-ext](https://github.com/Mieluoxxx/pi-ext) from [suryavamsi6/pi-stats-dashboard](https://github.com/suryavamsi6/pi-stats-dashboard) @ `3ee97be` — package `v0.1.3` plus the unreleased dashboard change from that commit (_Show token usage categories separately_). Only `README.md`, `LICENSE`, `artifacts/`, `extensions/`, `src/`, and `test/` from upstream are tracked here; the upstream `flake.nix`/`flake.lock` NixOS packaging and GitHub Actions workflow are not.
 >
-> Local changes on top of upstream, both in `src/dashboard.html`: responsive layout fixes so panels, tables, and chart labels no longer overflow their container, and count abbreviation (`K`/`M`/`B`) instead of raw numbers.
+> Local changes on top of upstream: responsive desktop layout fixes in `src/dashboard.html` so panels, tables, and chart labels no longer overflow their container; count abbreviation (`K`/`M`/`B`) instead of raw numbers; and the upstream mobile breakpoints (`max-width: 850px` / `430px`) removed. `src/server.js` re-reads `dashboard.html` on every page request, so panel edits show up without restarting Pi.
 
 ![Pi Stats dashboard](./artifacts/stats.png)
 
