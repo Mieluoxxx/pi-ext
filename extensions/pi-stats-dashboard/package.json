@@ -1,0 +1,51 @@
+{
+  "name": "@moguw/pi-stats-dashboard",
+  "version": "0.1.3",
+  "description": "Local usage and behavior dashboard for Pi agent sessions",
+  "type": "module",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "dashboard",
+    "llm",
+    "statistics"
+  ],
+  "license": "MIT",
+  "author": "suryavamsi6",
+  "engines": {
+    "node": ">=22"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mieluoxxx/pi-ext.git",
+    "directory": "extensions/pi-stats-dashboard"
+  },
+  "bugs": {
+    "url": "https://github.com/Mieluoxxx/pi-ext/issues"
+  },
+  "homepage": "https://github.com/Mieluoxxx/pi-ext/tree/main/extensions/pi-stats-dashboard#readme",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "files": [
+    "extensions",
+    "src",
+    "test",
+    "artifacts/stats.png",
+    "README.md",
+    "LICENSE",
+    "package.json"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check extensions/stats.js && node --check src/aggregate.js && node --check src/behavior.js && node --check src/server.js"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/stats.js"
+    ],
+    "image": "./artifacts/stats.png"
+  }
+}
