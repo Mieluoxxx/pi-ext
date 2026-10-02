@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "全局指令、默认思考强度和快捷键",
+  "description": "全局指令、默认思考强度、默认工具和快捷键",
   "packages": ["global-agents"],
   "files": [
     { "from": "settings.json", "to": "agent/settings.json", "mode": "merge" },

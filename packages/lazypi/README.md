@@ -37,36 +37,35 @@ npx @moguw/lazypi --local                  # install into .pi/settings.json of t
 
 ### Portable package sources
 
-The extension set follows a 17-extension `pi list` snapshot, normalizing nine local [pi-ext](https://github.com/Mieluoxxx/pi-ext) checkouts to their `@moguw` npm package sources. Three existing file entries (AGENTS and the two Vesper themes) remain separate from that extension list. npm sources remain unpinned; package-name parity is not a guarantee of byte-for-byte version parity. Publish new package versions before releasing a LazyPi catalog that requires them.
+The extension set follows a 16-extension `pi list` snapshot, normalizing nine local [pi-ext](https://github.com/Mieluoxxx/pi-ext) checkouts to their `@moguw` npm package sources. Five existing file entries (AGENTS, the two Vesper themes, `WATCHDOG.yml` and `vision.json`) remain separate from that extension list. npm sources remain unpinned; package-name parity is not a guarantee of byte-for-byte version parity. Publish new package versions before releasing a LazyPi catalog that requires them.
 
 | Catalog id | Category | Pi install source |
 | --- | --- | --- |
-| `web-access` | `core` | `npm:@moguw/pi-web-access` |
+| `advisor` | `core` | `npm:@moguw/pi-advisor` |
 | `tool-display` | `ui` | `npm:@moguw/pi-tool-display` |
+| `token-speed` | `ui` | `npm:pi-token-speed` |
+| `stats-dashboard` | `ui` | `npm:@moguw/pi-stats-dashboard` |
 | `interactive-shell` | `tools` | `npm:@moguw/pi-interactive-shell` |
 | `hashline-edit-pro` | `tools` | `npm:@moguw/pi-hashline-edit-pro` |
 | `session-rename` | `herdr` | `npm:@moguw/pi-session-rename` |
 | `session-migrate` | `herdr` | `npm:@moguw/pi-session-migrate` |
 | `session-fork` | `herdr` | `npm:@moguw/pi-session-fork` |
 | `openai-tools` | `codex` | `npm:@moguw/pi-openai-tools` |
-| `lazy-tools` | `tools` | `npm:@moguw/pi-lazy-tools` |
-| `computer-use` | `tools` | `npm:@injaneity/pi-computer-use` |
-| `advisor` | `core` | `npm:pi-omp-advisor` |
 
-The old `subagents`, TPS, Recap, CodeGraph extension, Simplify, Context7 and standalone `apply-patch` entries are no longer selected by this catalog; `advisor` now refers to `pi-omp-advisor`, not `@juicesharp/rpiv-advisor`. CodeGraph remains an independently installed CLI/Skill workflow, not a catalog extension.
+The old `subagents`, TPS, Recap, CodeGraph extension, Simplify, Context7, standalone `apply-patch`, `web-access`, `lazy-tools` and `computer-use` entries are no longer selected by this catalog; `advisor` now refers to `@moguw/pi-advisor`, not `pi-omp-advisor` or `@juicesharp/rpiv-advisor`. CodeGraph remains an independently installed CLI/Skill workflow, not a catalog extension.
 
 Catalog updates do **not** migrate existing local-path registrations or uninstall removed entries. Migrate those registrations explicitly when ready; the catalog change does not alter your running Pi. Installs conservatively check global and current-project registrations for the declared old Advisor / standalone apply-patch sources (including pinned forms) when their replacements are selected; the other scope is only read, never rewritten. This is a guard for known source strings, not a detector for every local checkout, resource filter, trust decision or other project.
 
 ### Newly aligned tools
 
-- **[OpenAI tools](https://github.com/Mieluoxxx/pi-ext/tree/main/extensions/pi-openai-tools)** combines context management, remote compaction, Astra compatibility and `apply_patch`. Image generation is disabled by default. Remove or disable standalone `pi-apply-patch` before loading this package; gateway/model support still needs separate verification.
-- **[Lazy tools](https://github.com/Mieluoxxx/pi-ext/tree/main/extensions/pi-lazy-tools)** exposes `load_capability`; `/capability` enables an existing group and `/tools-status` reports its state. It ships its own Skills but does not install missing providers, copy credentials or grant permission to delegate. In this snapshot, dedicated Context7/subagent packages are not installed; their groups remain unavailable unless another host/package provides the tools. Available web, FFF, hashline, desktop and OpenAI providers load before this gate.
-- **[Computer use](https://github.com/injaneity/pi-computer-use)** provides desktop inspection and interaction; `/computer-use` shows configuration. macOS requires Accessibility and Screen Recording permission, Windows an interactive desktop, and Linux a supported graphical/accessibility session. Installing a package does not grant OS permissions.
-- **[OMP Advisor](https://github.com/Scott-Meyer/pi-omp-advisor)** watches the session and is controlled by `/advisor` and optional `WATCHDOG.yml`. It starts observation by default, incurs extra model usage, and sends observed context to its configured provider. Review its configuration before enabling it on another device.
+- **[OpenAI tools](https://github.com/Mieluoxxx/pi-ext/tree/main/extensions/pi-openai-tools)** combines context management, remote compaction, Astra compatibility and `apply_patch`. Image generation is disabled by default. Remove or disable standalone `pi-apply-patch` before loading this package; gateway/model support still needs separate verification. Per-package resource filters (the object form in `settings.json` `packages`) are applied by Pi itself and stay out of scope for LazyPi.
+- **[Token speed](https://www.npmjs.com/package/pi-token-speed)** renders live generation speed; the `ui` preset places it in the zentui footer and turns on its visibility.
+- **[Stats dashboard](https://github.com/Mieluoxxx/pi-ext/tree/main/extensions/pi-stats-dashboard)** aggregates local `/stats` usage: lifetime/today/7d/30d tokens, costs and model/project/tool distributions from persisted session JSONL.
+- **[pi-advisor](https://github.com/Mieluoxxx/pi-ext/tree/main/extensions/pi-advisor)** runs independent advisor consultations with stable cache prefixes, budget metering, timeouts and opt-in completion review; it is derived from `rpiv-mono`'s rpiv-advisor. The `advisor-watchdog` config entry installs `WATCHDOG.yml`, which references providers from the device-managed `models.json`.
 
 LazyPi does not copy the maintainer's `models.json` and does not ship a CPA/model preset. Model configuration and credentials remain device-managed. The generic `merge-models` mode is available only for external files explicitly supplied by the user.
 
-Web Access preferences now belong to the optional `workflow` preset, not the extension's post-install hook. Its `web-search` target follows the extension's lookup: `PI_CODING_AGENT_DIR/web-search.json`, otherwise `XDG_CONFIG_HOME/pi/web-search.json`, otherwise `~/.pi/web-search.json`. Installing the extension alone no longer changes these preferences.
+`web-access` is no longer part of this catalog. The dedicated `web-search` preset target remains available for custom presets and follows the extension's lookup: `PI_CODING_AGENT_DIR/web-search.json`, otherwise `XDG_CONFIG_HOME/pi/web-search.json`, otherwise `~/.pi/web-search.json`.
 
 ## Composable configuration presets
 
@@ -74,9 +73,9 @@ Presets install their catalog requirements and apply configuration files in one 
 
 | Preset | Configuration |
 | --- | --- |
-| `base` | Global AGENTS.md, `xhigh` default thinking, transcript-search shortcut |
-| `ui` | Zentui preferences, tool-display, Vesper theme files; selects the built-in `dark` theme |
-| `workflow` | Workspace history, Goal (100 automatic turns), deferred interactive shell, FFF `tools-and-ui`, hashline editing, automatic naming, Web Search `ctrl+shift+s` |
+| `base` | Global AGENTS.md, `xhigh` default thinking, default tools (`+codemode`, `+tool_search`), transcript-search shortcut |
+| `ui` | Zentui preferences, tool-display, token-speed, stats dashboard, Vesper theme files; follows the `system` theme |
+| `workflow` | Workspace history, Goal (100 automatic turns), deferred interactive shell, FFF `tools-and-ui`, hashline editing, automatic naming |
 
 ```bash
 # From this checkout, preview before applying (no installs or writes):

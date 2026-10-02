@@ -97,7 +97,7 @@ test("a package installation failure does not write compatibility config", (t) =
 test("an unrelated package failure does not suppress successful compatibility post-processing", (t) => {
 	const state = createWorkspace(t);
 	writeFakePi(state.bin);
-	const result = runCli(["--yes", "--only", "tool-display,hashline-edit-pro,advisor"], { ...state, failSource: "npm:pi-omp-advisor" });
+	const result = runCli(["--yes", "--only", "tool-display,hashline-edit-pro,advisor"], { ...state, failSource: "npm:@moguw/pi-advisor" });
 	assert.equal(result.status, 1, `STDOUT:\n${result.stdout}\nSTDERR:\n${result.stderr}`);
 	assert.deepEqual(JSON.parse(readFileSync(globalConfigPath(state.agentDir), "utf8")), {
 		registerToolOverrides: { read: false },
@@ -202,8 +202,8 @@ test("new tool packages install from npm and skip already-installed sources", (t
 	const state = createWorkspace(t);
 	writeFakePi(state.bin);
 	const callsPath = join(state.root, "pi-calls.log");
-	const sources = ["npm:@injaneity/pi-computer-use", "npm:@moguw/pi-openai-tools"];
-	const args = ["--yes", "--only", "computer-use,openai-tools"];
+	const sources = ["npm:@ff-labs/pi-fff", "npm:@moguw/pi-openai-tools"];
+	const args = ["--yes", "--only", "fff,openai-tools"];
 	const first = runCli(args, { ...state, callsPath });
 	assert.equal(first.status, 0, `STDOUT:\n${first.stdout}\nSTDERR:\n${first.stderr}`);
 	const calls = readFileSync(callsPath, "utf8");

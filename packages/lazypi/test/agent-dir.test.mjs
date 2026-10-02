@@ -91,7 +91,7 @@ test("resolveAgentConfigDir matches Pi path semantics", () => {
 test("status reads settings from PI_CODING_AGENT_DIR", (t) => {
 	const { home, workspace } = createWorkspace(t);
 	const customAgentDir = join(home, ".pi", "lazy");
-	writeSettings(join(home, ".pi", "agent"), ["npm:pi-omp-advisor"]);
+	writeSettings(join(home, ".pi", "agent"), ["npm:@moguw/pi-advisor"]);
 	writeSettings(customAgentDir, ["npm:@narumitw/pi-goal"]);
 
 	const result = runCli(["status"], { cwd: workspace, home, agentDir: "~/.pi/lazy" });
@@ -144,7 +144,7 @@ test("--local settings remain independent of PI_CODING_AGENT_DIR", (t) => {
 	const { home, workspace } = createWorkspace(t);
 	const customAgentDir = join(home, ".pi", "lazy");
 	writeSettings(customAgentDir, ["npm:@narumitw/pi-goal"]);
-	writeSettings(join(workspace, ".pi"), ["npm:pi-omp-advisor"]);
+	writeSettings(join(workspace, ".pi"), ["npm:@moguw/pi-advisor"]);
 
 	const result = runCli(["status", "--local"], { cwd: workspace, home, agentDir: customAgentDir });
 

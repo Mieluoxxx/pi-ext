@@ -1,3 +1,5 @@
 {
-  "theme": "dark"
+  "theme": "system",
+  "tuiMode": "regular",
+  "quietStartup": "header"
 }

@@ -89,7 +89,6 @@ test("built-in and external presets merge once, preserve resources, and detect d
 	assert.ok(merged.packages.indexOf(source("fff")) < merged.packages.indexOf(source("hashline-edit-pro")));
 	assert.equal(json(join(state.agentDir, "zentui.json")).components.footer.styles.starship.compactMaxLines, 3);
 	assert.equal(json(join(state.agentDir, "zentui.json")).components.workingLine.messages.values.length, 16);
-	assert.equal(json(join(state.agentDir, "web-search.json")).shortcuts.curate, "ctrl+shift+s");
 	assert.equal(json(join(state.agentDir, "extensions/pi-tool-display/config.json")).registerToolOverrides.read, false);
 	assert.equal(readFileSync(join(state.agentDir, "AGENTS.md"), "utf8"), readFileSync("agent/AGENTS.md", "utf8"));
 	assert.equal(backups(state).filter((name) => name.startsWith("settings.json.")).length, 1);
@@ -309,7 +308,7 @@ test("local package duplicates block both preview and installation", (t) => {
 
 test("replacement packages refuse known legacy conflicts without uninstalling them", (t) => {
 	const state = workspace(t);
-	for (const [id, legacy] of [["advisor", "npm:@juicesharp/rpiv-advisor@1.0.0"], ["openai-tools", "git:github.com/code-yeongyu/pi-apply-patch@v0.1.2"], ["openai-tools", "https://github.com/code-yeongyu/pi-apply-patch.git@v0.1.2"]]) {
+	for (const [id, legacy] of [["advisor", "npm:@juicesharp/rpiv-advisor@1.0.0"], ["advisor", "npm:pi-omp-advisor"], ["openai-tools", "git:github.com/code-yeongyu/pi-apply-patch@v0.1.2"], ["openai-tools", "https://github.com/code-yeongyu/pi-apply-patch.git@v0.1.2"]]) {
 		writeJson(join(state.agentDir, "settings.json"), { packages: [legacy] });
 		const file = preset(state, "legacy-conflict", [], [id]);
 		for (const args of [["--only", id, "--yes"], ["--preset", file, "--dry-run"], ["--preset", file, "--yes"]]) {

@@ -1,3 +1,4 @@
 {
-  "defaultThinkingLevel": "xhigh"
+  "defaultThinkingLevel": "xhigh",
+  "defaultTools": ["+codemode", "+tool_search"]
 }

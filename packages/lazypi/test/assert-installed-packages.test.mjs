@@ -11,25 +11,24 @@ test("expectedPackageSources matches the full catalog", () => {
 
 test("pi-ext catalog entries use the published moguw sources", () => {
 	const expected = expectedPackageSources();
-	for (const id of ["web-access", "hashline-edit-pro", "interactive-shell", "tool-display", "session-rename", "session-migrate", "session-fork", "openai-tools", "lazy-tools"]) {
+	for (const id of ["tool-display", "interactive-shell", "hashline-edit-pro", "session-rename", "session-migrate", "session-fork", "openai-tools", "stats-dashboard", "advisor"]) {
 		const source = `npm:@moguw/pi-${id}`;
 		assert.equal(PACKAGES.find((pkg) => pkg.id === id)?.source, source);
 		assert.ok(expected.includes(source));
 	}
 });
 
-test("catalog matches the normalized seventeen-extension pi list snapshot", () => {
+test("catalog matches the normalized sixteen-extension pi list snapshot", () => {
 	const expected = [
 		"npm:pi-workspace-history", "npm:@narumitw/pi-goal", "npm:@getpipher/vision", "npm:pi-zentui",
-		"npm:@moguw/pi-tool-display", "npm:@moguw/pi-interactive-shell", "npm:@ff-labs/pi-fff",
+		"npm:@moguw/pi-tool-display", "npm:@moguw/pi-interactive-shell", "npm:pi-token-speed", "npm:@moguw/pi-stats-dashboard", "npm:@ff-labs/pi-fff",
 		"npm:@moguw/pi-hashline-edit-pro", "git:github.com/DietrichGebert/ponytail@v4.9.0",
 		"npm:@moguw/pi-session-rename", "npm:@moguw/pi-session-migrate", "npm:@moguw/pi-session-fork",
-		"npm:@moguw/pi-web-access", "npm:@injaneity/pi-computer-use", "npm:@moguw/pi-openai-tools",
-		"npm:@moguw/pi-lazy-tools", "npm:pi-omp-advisor",
+		"npm:@moguw/pi-openai-tools", "npm:@moguw/pi-advisor",
 	];
 	assert.deepEqual(expectedPackageSources().sort(), expected.sort());
-	assert.equal(PACKAGES.find((pkg) => pkg.id === "advisor").source, "npm:pi-omp-advisor");
-	assert.deepEqual(PACKAGES.filter((pkg) => !pkg.source).map((pkg) => pkg.id), ["vesper-dark", "vesper-light", "global-agents"]);
+	assert.equal(PACKAGES.find((pkg) => pkg.id === "advisor").source, "npm:@moguw/pi-advisor");
+	assert.deepEqual(PACKAGES.filter((pkg) => !pkg.source).map((pkg) => pkg.id), ["vesper-dark", "vesper-light", "global-agents", "advisor-watchdog", "vision-config"]);
 });
 
 test("expectedPackageSources supports excluded package ids", () => {

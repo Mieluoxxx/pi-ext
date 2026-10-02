@@ -24,32 +24,33 @@ import {
 // Customize this array; it is the only extension catalog used by the CLI.
 export const PACKAGES = [
 	// core
-	{ id: "web-access", category: "core", source: "npm:@moguw/pi-web-access", description: "网页搜索与页面抓取", hint: "为 Pi 提供 WebSearch 和 WebFetch 能力；个人偏好通过 workflow 预设安装。", loadBefore: ["lazy-tools"] },
-	{ id: "advisor", category: "core", source: "npm:pi-omp-advisor", description: "实时会话顾问", hint: "通过 /advisor 管理观察者，WATCHDOG.yml 定制模型与行为；默认随主会话观察，会产生额外模型调用。", conflicts: ["npm:@juicesharp/rpiv-advisor"] },
+	{ id: "advisor", category: "core", source: "npm:@moguw/pi-advisor", description: "实时会话顾问", hint: "独立 advisor 咨询：稳定缓存前缀、费用预算与超时、按收益保活；WATCHDOG.yml 由 advisor-watchdog 配置条目安装，默认随主会话观察会产生额外调用。", conflicts: ["npm:@juicesharp/rpiv-advisor", "npm:pi-omp-advisor"] },
 	{ id: "workspace-history", category: "core", source: "npm:pi-workspace-history", description: "工作区回溯", hint: "回滚的不只是聊天记录——导航历史时同步恢复工作区文件，支持 /undo、/redo 与 /tree。" },
 	{ id: "goal", category: "core", source: "npm:@narumitw/pi-goal", description: "长期目标模式", hint: "用 /goal 设定目标，Pi 跨回合自主推进直至完成，支持暂停、恢复与队列。" },
-	{ id: "vision", category: "core", source: "npm:@getpipher/vision", description: "视觉能力", hint: "按主模型能力自动路由：多模态直读图片，纯文本模型才委托视觉模型分析。" },
+	{ id: "vision", category: "core", source: "npm:@getpipher/vision", description: "视觉能力", hint: "按主模型能力自动路由：多模态直读图片，纯文本模型才委托视觉模型分析；vision-config 配置条目定制路由与缓存。" },
 	// ui
 	{ id: "zentui", category: "ui", source: "npm:pi-zentui", description: "终端界面美化", hint: "Opencode 风格编辑框与消息样式，Starship 风格状态栏，四类界面元素独立配置。" },
 	{ id: "tool-display", category: "ui", source: "npm:@moguw/pi-tool-display", description: "工具输出渲染", hint: "紧凑渲染工具调用与 diff，自动折叠截断冗长输出，让终端更清爽。", postInstall: [{ requiresSelected: ["hashline-edit-pro"], jsonMerge: { path: "extensions/pi-tool-display/config.json", value: { registerToolOverrides: { read: false } } } }] },
+	{ id: "token-speed", category: "ui", source: "npm:pi-token-speed", description: "令牌速度显示", hint: "在状态栏实时显示生成速度；ui 预设把它放进 zentui footer 右侧并开启可见性。" },
+	{ id: "stats-dashboard", category: "ui", source: "npm:@moguw/pi-stats-dashboard", description: "本地用量面板", hint: "/stats 扫描持久化会话 JSONL，聚合 lifetime/today/7d/30d 令牌、费用与模型/项目/工具分布。" },
 	// tools
 	{ id: "interactive-shell", category: "tools", source: "npm:@moguw/pi-interactive-shell", description: "交互式 Shell 覆盖层", hint: "在可观察的覆盖层中运行长时间 CLI 与终端工作流。" },
-	{ id: "fff", category: "tools", source: "npm:@ff-labs/pi-fff", description: "模糊文件搜索", hint: "基于 FFF 的模糊文件与内容搜索，快速定位文件和代码；workflow 预设使用 tools-and-ui 模式。", loadBefore: ["hashline-edit-pro", "lazy-tools"] },
-	{ id: "hashline-edit-pro", category: "tools", source: "npm:@moguw/pi-hashline-edit-pro", description: "哈希锚点编辑", hint: "用行级哈希锚点做精确的读取与编辑。", loadBefore: ["lazy-tools"] },
+	{ id: "fff", category: "tools", source: "npm:@ff-labs/pi-fff", description: "模糊文件搜索", hint: "基于 FFF 的模糊文件与内容搜索，快速定位文件和代码；workflow 预设使用 tools-and-ui 模式。", loadBefore: ["hashline-edit-pro"] },
+	{ id: "hashline-edit-pro", category: "tools", source: "npm:@moguw/pi-hashline-edit-pro", description: "哈希锚点编辑", hint: "用行级哈希锚点做精确的读取与编辑。" },
 	{ id: "ponytail", category: "tools", source: "git:github.com/DietrichGebert/ponytail@v4.9.0", description: "极简编码准则", hint: "懒惰资深工程师模式：能不写的代码就不写，优先复用现有实现，保持安全底线。" },
-	{ id: "computer-use", category: "tools", source: "npm:@injaneity/pi-computer-use", description: "桌面界面操作", hint: "通过 /computer-use 检查桌面工具配置；macOS 需辅助功能与录屏权限，其他系统需可用的图形会话。", loadBefore: ["lazy-tools"] },
-	{ id: "lazy-tools", category: "tools", source: "npm:@moguw/pi-lazy-tools", description: "按需启用工具组", hint: "读取对应 Skill 后按需启用已注册工具；/capability 手动启用，/tools-status 查看状态，不自动安装缺失能力。" },
 	// herdr
 	{ id: "session-rename", category: "herdr", source: "npm:@moguw/pi-session-rename", description: "会话自动命名", hint: "根据对话上下文自动给会话起名，/rename 随时手动管理。" },
 	{ id: "session-migrate", category: "herdr", source: "npm:@moguw/pi-session-migrate", description: "会话迁移", hint: "项目挪路径后找回遗留会话，改写 cwd 迁入新位置，用 /migrate 执行。" },
 	{ id: "session-fork", category: "herdr", source: "npm:@moguw/pi-session-fork", description: "会话分叉", hint: "把当前会话分叉到 Herdr 窗格或标签页，/btw 内联或旁路追问。" },
 	// codex
-	{ id: "openai-tools", category: "codex", source: "npm:@moguw/pi-openai-tools", description: "OpenAI 上下文与补丁工具", hint: "整合上下文管理、远程压缩、Astra 兼容和 apply_patch；图像生成默认关闭，不应与独立 pi-apply-patch 同时加载。", loadBefore: ["lazy-tools"], conflicts: ["git:github.com/code-yeongyu/pi-apply-patch", "https://github.com/code-yeongyu/pi-apply-patch"] },
+	{ id: "openai-tools", category: "codex", source: "npm:@moguw/pi-openai-tools", description: "OpenAI 上下文与补丁工具", hint: "整合上下文管理、远程压缩、Astra 兼容和 apply_patch；图像生成默认关闭，不应与独立 pi-apply-patch 同时加载。", conflicts: ["git:github.com/code-yeongyu/pi-apply-patch", "https://github.com/code-yeongyu/pi-apply-patch"] },
 	// themes
 	{ id: "vesper-dark", category: "themes", themeFiles: ["themes/vesper-dark.json"], description: "Vesper 暗色主题", hint: "暖桃与薄荷色调的近黑暗色主题；将 settings.theme 设为 \"vesper-dark\" 启用。" },
 	{ id: "vesper-light", category: "themes", themeFiles: ["themes/vesper-light.json"], description: "Vesper 亮色主题", hint: "暖米色底的亮色变体，桃色强调、薄荷点缀；将 settings.theme 设为 \"vesper-light\" 启用。" },
 	// config
 	{ id: "global-agents", category: "config", agentFiles: ["agent/AGENTS.md"], description: "全局 AGENTS.md", hint: "安装全局 agent 配置文件到 ~/.pi/agent/AGENTS.md，覆盖前自动备份。" },
+	{ id: "advisor-watchdog", category: "config", agentFiles: ["agent/WATCHDOG.yml"], description: "Advisor 观察者配置", hint: "安装 WATCHDOG.yml 到 agent 根目录，定制 advisor 的观察者与模型（引用 models.json 里的 provider）；覆盖前自动备份。" },
+	{ id: "vision-config", category: "config", agentFiles: ["agent/vision.json"], description: "Vision 配置", hint: "安装 vision.json 到 agent 根目录，定制视觉路由、缓存与重试行为；覆盖前自动备份。" },
 ];
 const CATEGORIES = [...new Set(PACKAGES.map((pkg) => pkg.category))];
 

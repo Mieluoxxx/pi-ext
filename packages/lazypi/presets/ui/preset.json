@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "description": "Zentui 界面、工具渲染和 Vesper 主题文件",
-  "packages": ["zentui", "tool-display", "vesper-dark", "vesper-light"],
+  "description": "Zentui 界面、状态栏与用量面板、工具渲染和 Vesper 主题文件（主题默认跟随 system，需要时手动切 Vesper）",
+  "packages": ["zentui", "tool-display", "token-speed", "stats-dashboard", "vesper-dark", "vesper-light"],
   "files": [
     { "from": "settings.json", "to": "agent/settings.json", "mode": "merge" },
     { "from": "zentui.json", "to": "agent/zentui.json", "mode": "merge" }

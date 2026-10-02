@@ -61,7 +61,7 @@ export function runPackedCliSmoke({ cwd = process.cwd() } = {}) {
 			const install = invoke("install --yes");
 			assert.equal(install.status, 0, resultSummary(install));
 		}
-		assert.deepEqual(JSON.parse(readFileSync(join(agent, "settings.json"), "utf8")), { packages: ["npm:keep"], defaultModel: "keep-model", defaultThinkingLevel: "high" });
+		assert.deepEqual(JSON.parse(readFileSync(join(agent, "settings.json"), "utf8")), { packages: ["npm:keep"], defaultModel: "keep-model", defaultThinkingLevel: "high", defaultTools: ["+codemode", "+tool_search"] });
 		assert.deepEqual(JSON.parse(readFileSync(join(agent, "keybindings.json"), "utf8")), { "tui.altScreen.search": "ctrl+shift+f" });
 		assert.equal(readFileSync(join(agent, "AGENTS.md"), "utf8"), readFileSync(join(cwd, "agent", "AGENTS.md"), "utf8"));
 		assert.deepEqual(JSON.parse(readFileSync(join(agent, "models.json"), "utf8")), { providers: { custom: { apiKey: "$TEST_MODEL_KEY", models: [{ id: "keep" }, { id: "selected", contextWindow: 8000 }] } } });

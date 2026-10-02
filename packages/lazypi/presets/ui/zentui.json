@@ -97,7 +97,7 @@
         "starship": {
           "format": "",
           "responsive": true,
-          "compactFormat": "$cwd$wrap(in $session_name)$wrap(on $git_branch) $git_status$wrap$context$wrap_sep$tokens",
+          "compactFormat": "$cwd$wrap(on $git_branch) $git_status$wrap$context$wrap_sep$tokens",
           "compactMaxLines": 2,
           "separator": "pipe",
           "contextStyle": "text",
@@ -111,7 +111,7 @@
           },
           "segments": {
             "cwd": true,
-            "sessionName": true,
+            "sessionName": false,
             "gitBranch": true,
             "gitStatus": true,
             "gitCounts": true,
@@ -143,16 +143,25 @@
           "extensionStatuses": {
             "defaultPlacement": "off",
             "placements": {
-              "ponytail": "left"
+              "ponytail": "left",
+              "tokenSpeed": "right"
             },
-            "colorModes": {}
+            "colorModes": {
+              "tokenSpeed": "zentui"
+            }
           }
         }
-      }
+      },
+      "codexQuota": false
     },
     "thinkingSteps": {
       "enabled": true,
       "mode": "tree"
+    },
+    "extensionStatuses": {
+      "visibility": {
+        "tokenSpeed": "show"
+      }
     }
   }
 }
