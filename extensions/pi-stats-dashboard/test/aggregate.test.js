@@ -13,23 +13,24 @@ test("aggregates sessions, forks, transcripts, tools and warnings", async () => 
   const a = { type: "message", id: "a1", timestamp: new Date().toISOString(), message: { role: "assistant", provider: "p", model: "m", usage: u(10), stopReason: "stop", content: [{ type: "toolCall", id: "t", name: "bash", arguments: {} }] } };
   const header = JSON.stringify({ type: "session", version: 3, id: "s" });
   await writeFile(join(root, "project", "a.jsonl"), [header, JSON.stringify({ type: "message", id: "u", timestamp: new Date().toISOString(), message: { role: "user", content: [{ type: "text", text: "NOOO!!! you forgot" }] } }), JSON.stringify(a), "bad json", JSON.stringify({ type: "compaction", id: "c", timestamp: new Date().toISOString(), usage: u(2) })].join("\n"));
-  await writeFile(join(root, "project", "fork.jsonl"), [header, JSON.stringify(a), JSON.stringify({ type: "message", id: "e1", timestamp: new Date().toISOString(), message: { role: "assistant", provider: "p", model: "m", usage: u(5), stopReason: "error", errorMessage: "502: {\"error\":\"bad gateway\"}" } })].join("\n"));
+  await writeFile(join(root, "project", "fork.jsonl"), [header, JSON.stringify(a), JSON.stringify({ type: "message", id: "e1", timestamp: new Date().toISOString(), message: { role: "assistant", provider: "p", model: "m", usage: u(5), stopReason: "error", errorMessage: "502: {\"error\":\"bad gateway\"}" } }), JSON.stringify({ type: "message", id: "tr1", timestamp: new Date().toISOString(), message: { role: "toolResult", toolName: "bash", usage: u(2) } })].join("\n"));
   await mkdir(join(root, "project", "subagent-artifacts"));
   await writeFile(join(root, "project", "subagent-artifacts", "x_transcript.jsonl"), JSON.stringify({ recordType: "message", role: "assistant", runId: "r", timestamp: Date.now(), provider: "p", model: "m2", usage: u(3) }));
   const out = await aggregate(root);
-  assert.equal(out.totals.all.requests, 4);
-  assert.equal(out.totals.all.input, 20);
+  assert.equal(out.totals.all.requests, 5);
+  assert.equal(out.totals.all.input, 22);
   assert.equal(out.diagnostics.invalidLines, 1);
   assert.equal(out.behavior.messages, 1);
   assert.ok(out.behavior.anguish > 0);
   assert.equal(out.by.tool.bash.requests, 1);
   assert.equal(out.ranges.today.by.tool.bash.requests, 1);
+  assert.equal(out.by.tool.bash.tokens, 4);
   assert.deepEqual(out.errors, [["HTTP 502", 1]]);
   assert.equal(out.totals.all.errors, 1);
-  assert.equal(out.hours[String(new Date().getHours())].requests, 4);
-  assert.equal(out.ranges.today.by.model["p/m"].requests, 3);
+  assert.equal(out.hours[String(new Date().getHours())].requests, 5);
+  assert.equal(out.ranges.today.by.model["p/m"].requests, 4);
   assert.deepEqual(out.ranges.today.errorTypes, [["HTTP 502", 1]]);
-  assert.deepEqual(out.ranges.month.by.provider["p"].requests, 4);
+  assert.deepEqual(out.ranges.month.by.provider["p"].requests, 5);
 });
 
 test("errorType buckets raw provider messages", () => {
