@@ -1,0 +1,41 @@
+name: test
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+
+      - name: Install pi
+        run: npm install -g @earendil-works/pi-coding-agent
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run test suite
+        run: npm test
+
+      - name: Smoke-test packed CLI artifact
+        run: node scripts/packed-cli-smoke.mjs
+
+      - name: Run lazypi --yes
+        run: node bin/lazypi.mjs --yes
+
+      - name: Assert expected packages for full install
+        run: node scripts/assert-installed-packages.mjs --check-status

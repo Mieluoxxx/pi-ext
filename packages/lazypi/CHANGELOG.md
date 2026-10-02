@@ -1,0 +1,149 @@
+# Changelog
+
+## [0.6.4](https://github.com/robzolkos/LazyPi/compare/v0.6.3...v0.6.4) (2026-07-27)
+
+
+### Bug Fixes
+
+* honor PI_CODING_AGENT_DIR ([#74](https://github.com/robzolkos/LazyPi/issues/74)) ([e5044cb](https://github.com/robzolkos/LazyPi/commit/e5044cbce642c5eb8f5d1f707c09125e876eb59e))
+
+## [0.6.3](https://github.com/robzolkos/LazyPi/compare/v0.6.2...v0.6.3) (2026-06-08)
+
+
+### Bug Fixes
+
+* repair extension settings load order ([#70](https://github.com/robzolkos/LazyPi/issues/70)) ([6f3deea](https://github.com/robzolkos/LazyPi/commit/6f3deea2499d602fb232fff87bd7490c57a4111c))
+
+## [0.6.2](https://github.com/robzolkos/LazyPi/compare/v0.6.1...v0.6.2) (2026-05-20)
+
+
+### Bug Fixes
+
+* delegate lazy update to pi update ([#63](https://github.com/robzolkos/LazyPi/issues/63)) ([184b035](https://github.com/robzolkos/LazyPi/commit/184b0359975edb473797c723c48a08459c42589b))
+
+## [0.6.1](https://github.com/robzolkos/LazyPi/compare/v0.6.0...v0.6.1) (2026-05-19)
+
+
+### Bug Fixes
+
+* ensure LazyPi updates Pi core with latest npm release ([#61](https://github.com/robzolkos/LazyPi/issues/61)) ([d1fd4c4](https://github.com/robzolkos/LazyPi/commit/d1fd4c4eab4a7bd33aea8aca18835dd59617bb16))
+* improve videos grid responsiveness ([#58](https://github.com/robzolkos/LazyPi/issues/58)) ([9fa78c0](https://github.com/robzolkos/LazyPi/commit/9fa78c08ed230063f8fc5f79b6f74465ad002c76))
+
+## [0.6.0](https://github.com/robzolkos/LazyPi/compare/v0.5.1...v0.6.0) (2026-05-14)
+
+
+### Features
+
+* add missing Pi videos ([#50](https://github.com/robzolkos/LazyPi/issues/50)) ([81d0e1c](https://github.com/robzolkos/LazyPi/commit/81d0e1cdd577653bc3a29ee5c406d4bbbf742f88))
+
+
+### Bug Fixes
+
+* remove pi-themes from catalog ([#52](https://github.com/robzolkos/LazyPi/issues/52)) ([32aa514](https://github.com/robzolkos/LazyPi/commit/32aa514de3c2762cf0b0f653fb6b86f34921efbd))
+
+## [0.5.1](https://github.com/robzolkos/LazyPi/compare/v0.5.0...v0.5.1) (2026-05-07)
+
+
+### Bug Fixes
+
+* update Pi package namespace ([#46](https://github.com/robzolkos/LazyPi/issues/46)) ([94644c3](https://github.com/robzolkos/LazyPi/commit/94644c3b427b2368e28a174fc612c99ed80206a6))
+
+## [0.5.0](https://github.com/robzolkos/LazyPi/compare/v0.4.0...v0.5.0) (2026-04-30)
+
+
+### Features
+
+* add Mario Zechner testimonial quote to home page hero ([c282468](https://github.com/robzolkos/LazyPi/commit/c282468c6fde2bc53b2177aa9f5a81d4663fc0b3))
+* add Short Pi videos section ([#44](https://github.com/robzolkos/LazyPi/issues/44)) ([9fa5d82](https://github.com/robzolkos/LazyPi/commit/9fa5d820117b1e0f1db4d54580ae346a4f12eee4))
+* bust CSS cache on deploy using build timestamp ([1d91fba](https://github.com/robzolkos/LazyPi/commit/1d91fba1fdc298a69d118104f087d005ffa26f4a))
+* convert docs site to Jekyll for GitHub Pages compilation ([#41](https://github.com/robzolkos/LazyPi/issues/41)) ([963755d](https://github.com/robzolkos/LazyPi/commit/963755d20cf26aad0eba5abefa1da3f7e9848040))
+
+## [0.4.0](https://github.com/robzolkos/LazyPi/compare/v0.3.0...v0.4.0) (2026-04-29)
+
+
+### Features
+
+* add pi-slopchop package ([#39](https://github.com/robzolkos/LazyPi/issues/39)) ([d20e43d](https://github.com/robzolkos/LazyPi/commit/d20e43d1f2c25ae1ccebaa9dc278d7eb469df525))
+
+## [0.3.0](https://github.com/robzolkos/LazyPi/compare/v0.2.3...v0.3.0) (2026-04-29)
+
+
+### Features
+
+* add Claude Code CLI package ([9f6ba29](https://github.com/robzolkos/LazyPi/commit/9f6ba29cd5c4bb2d0471fac3278554e1d25d8da7))
+
+## [0.2.3](https://github.com/robzolkos/LazyPi/compare/v0.2.2...v0.2.3) (2026-04-24)
+
+
+### Bug Fixes
+
+* use upstream Git source for memory package ([09c1c79](https://github.com/robzolkos/LazyPi/commit/09c1c7943af7aec81b21fb698d66746994850059))
+
+## [0.2.2](https://github.com/robzolkos/LazyPi/compare/v0.2.1...v0.2.2) (2026-04-23)
+
+
+### Bug Fixes
+
+* **cli:** smoke-test packed npx entrypoint ([#30](https://github.com/robzolkos/LazyPi/issues/30)) ([e5e020b](https://github.com/robzolkos/LazyPi/commit/e5e020b8653d5d1515c41c315dec84e11d96b9fc))
+
+## [0.2.1](https://github.com/robzolkos/LazyPi/compare/v0.2.0...v0.2.1) (2026-04-23)
+
+
+### Bug Fixes
+
+* make LazyPi installs work on Windows ([#25](https://github.com/robzolkos/LazyPi/issues/25)) ([7ecc7e9](https://github.com/robzolkos/LazyPi/commit/7ecc7e91262242a6432d1edc88f298aabbde97f1))
+
+## [0.2.0](https://github.com/robzolkos/LazyPi/compare/v0.1.8...v0.2.0) (2026-04-23)
+
+
+### Features
+
+* migrate compound to upstream CE3 ([#26](https://github.com/robzolkos/LazyPi/issues/26)) ([e56c641](https://github.com/robzolkos/LazyPi/commit/e56c641c99026684c5e749a1387e404c6ed2cf4b))
+
+## [0.1.8](https://github.com/robzolkos/LazyPi/compare/v0.1.7...v0.1.8) (2026-04-22)
+
+
+### Bug Fixes
+
+* migrate legacy LazyPi autoresearch installs to the unpinned source ([#22](https://github.com/robzolkos/LazyPi/issues/22)) ([56cf0a6](https://github.com/robzolkos/LazyPi/commit/56cf0a6dba1fca75c7d7a7dca5344f433373be9e))
+
+## [0.1.7](https://github.com/robzolkos/LazyPi/compare/v0.1.6...v0.1.7) (2026-04-22)
+
+
+### Miscellaneous Chores
+
+* release 0.1.7 ([a4380db](https://github.com/robzolkos/LazyPi/commit/a4380db745768cbcb82f76c1d0b51739ee7b0b5f))
+
+## [0.1.6](https://github.com/robzolkos/LazyPi/compare/v0.1.5...v0.1.6) (2026-04-21)
+
+
+### Bug Fixes
+
+* add repository metadata for npm provenance ([f1e916f](https://github.com/robzolkos/LazyPi/commit/f1e916f83c3eb1059d1f7a283570a71e37c7e186))
+
+## [0.1.5](https://github.com/robzolkos/LazyPi/compare/v0.1.4...v0.1.5) (2026-04-21)
+
+
+### Bug Fixes
+
+* support official Compound Engineering install ([#13](https://github.com/robzolkos/LazyPi/issues/13)) ([ffe13e1](https://github.com/robzolkos/LazyPi/commit/ffe13e1499bf93d54e63c17450ae0ac848a4b856))
+
+## [0.1.4](https://github.com/robzolkos/LazyPi/compare/v0.1.3...v0.1.4) (2026-04-21)
+
+
+### Bug Fixes
+
+* publish npm from release-please workflow ([ff83cf4](https://github.com/robzolkos/LazyPi/commit/ff83cf431e2da6f6715357b274e26d8198bcb951))
+* publish npm packages on version tags ([21fb715](https://github.com/robzolkos/LazyPi/commit/21fb715e06b17694cfea10f5809a551e28ea26b9))
+
+## 0.1.3 (2026-04-21)
+
+
+### Features
+
+* add manual release-please npm publishing flow ([#7](https://github.com/robzolkos/LazyPi/issues/7)) ([c2c319c](https://github.com/robzolkos/LazyPi/commit/c2c319c38d7f9c1514b517153644ac00927c7875))
+
+
+### Bug Fixes
+
+* allow manual release version override ([844fc4f](https://github.com/robzolkos/LazyPi/commit/844fc4fe5c0c6ca3dc24c2bb0af0deb09123a413))

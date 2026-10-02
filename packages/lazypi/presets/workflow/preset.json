@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "description": "工作区回溯、Goal、交互 Shell、FFF、锚点编辑、自动命名和网页搜索偏好",
+  "packages": ["workspace-history", "goal", "interactive-shell", "fff", "hashline-edit-pro", "session-rename", "web-access"],
+  "files": [
+    { "from": "settings.json", "to": "agent/settings.json", "mode": "merge" },
+    { "from": "interactive-shell.json", "to": "agent/interactive-shell.json", "mode": "merge" },
+    { "from": "pi-fff.json", "to": "agent/pi-fff.json", "mode": "merge" },
+    { "from": "pi-goal.json", "to": "agent/pi-goal.json", "mode": "merge" },
+    { "from": "rename.json", "to": "agent/rename.json", "mode": "merge" },
+    { "from": "web-search.json", "to": "web-search", "mode": "merge" }
+  ]
+}

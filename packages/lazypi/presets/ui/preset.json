@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "description": "Zentui 界面、工具渲染和 Vesper 主题文件",
+  "packages": ["zentui", "tool-display", "vesper-dark", "vesper-light"],
+  "files": [
+    { "from": "settings.json", "to": "agent/settings.json", "mode": "merge" },
+    { "from": "zentui.json", "to": "agent/zentui.json", "mode": "merge" }
+  ]
+}

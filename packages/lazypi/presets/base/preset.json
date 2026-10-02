@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "description": "全局指令、默认思考强度和快捷键",
+  "packages": ["global-agents"],
+  "files": [
+    { "from": "settings.json", "to": "agent/settings.json", "mode": "merge" },
+    { "from": "keybindings.json", "to": "agent/keybindings.json", "mode": "merge" }
+  ]
+}
