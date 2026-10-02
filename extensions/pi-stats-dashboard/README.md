@@ -31,7 +31,7 @@ Then run Pi and use `/stats`.
 - Input, output, reasoning, cache read/write, total tokens, recorded cost, requests, and errors
 - Daily activity and breakdowns by model, provider, project, agent, and tool
 - Local-only behavior counters for user messages: yelling, profanity, anguish, correction, repetition, and blame
-- Malformed-record diagnostics
+- Error breakdown by type: aborts, timeouts, HTTP status codes, context overflow, stream interruptions
 
 Costs are the values recorded by providers and may be zero or unavailable. They are estimates, not invoices. Pi does not persist reliable historical latency, TTFT, tokens/sec, or subscription-window data, so those are intentionally not fabricated.
 
