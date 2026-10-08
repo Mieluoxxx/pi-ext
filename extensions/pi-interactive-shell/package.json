@@ -1,6 +1,6 @@
 {
   "name": "@moguw/pi-interactive-shell",
-  "version": "0.16.0",
+  "version": "0.16.1",
   "description": "Run AI coding agents in pi TUI overlays with interactive, hands-free, and dispatch supervision",
   "type": "module",
   "license": "MIT",
@@ -41,6 +41,7 @@
     "index.ts",
     "config.ts",
     "key-encoding.ts",
+    "launch-policy.ts",
     "overlay-component.ts",
     "pty-session.ts",
     "shell-resolution.ts",

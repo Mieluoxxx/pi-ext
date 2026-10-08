@@ -4,6 +4,11 @@ All notable changes to the `pi-interactive-shell` extension will be documented i
 
 ## [Unreleased]
 
+## [0.16.1] - 2026-10-08
+
+### Fixed
+- Ship `launch-policy.ts` in the published package. It was missing from `package.json#files`, so the 0.16.0 npm tarball omitted a module that `config.ts` imports and the extension failed to load.
+
 ## [0.16.0] - 2026-10-02
 
 Synced upstream [pi-interactive-shell](https://github.com/nicobailon/pi-interactive-shell) `77df9a8` (v0.17.0) onto the action-based contract. Reference waterline for the next sync; per-commit details live in the README's Upstream sync section.
