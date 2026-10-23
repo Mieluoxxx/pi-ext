@@ -4,6 +4,7 @@ import type { IBufferCell, Terminal as XtermTerminal } from "@xterm/headless";
 import xterm from "@xterm/headless";
 import { SerializeAddon } from "@xterm/addon-serialize";
 import { sliceLogOutput, trimRawOutput } from "./pty-log.ts";
+import { toLegacyInput } from "./key-encoding.ts";
 import {
 	buildCursorPositionResponse,
 	buildPrimaryDeviceAttributesResponse,
@@ -345,7 +346,7 @@ export class PtyTerminalSession {
 
 	write(data: string): void {
 		if (!this._exited) {
-			this.ptyProcess.write(data);
+			this.ptyProcess.write(toLegacyInput(data));
 		}
 	}
 

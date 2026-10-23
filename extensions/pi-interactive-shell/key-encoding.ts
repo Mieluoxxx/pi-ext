@@ -3,6 +3,8 @@
  * into terminal escape sequences.
  */
 
+import { parseKey } from "@earendil-works/pi-tui";
+
 // Named key sequences (without modifiers)
 const NAMED_KEYS: Record<string, string> = {
 	// Arrow keys
@@ -225,6 +227,27 @@ function encodeKeyToken(token: string): string {
 
 	// Unknown key, return as literal
 	return token;
+}
+
+// Kitty CSI-u and xterm modifyOtherKeys key reports (what the outer terminal
+// sends us once the Kitty keyboard protocol is active).
+const KEY_REPORT_REGEX = /\x1b\[(?:\d+(?::\d*)*(?:;\d+(?::\d+)?)?u|27;\d+;\d+~)/g;
+
+/**
+ * Rewrite Kitty / modifyOtherKeys key reports into the legacy byte sequences the
+ * inner PTY application understands. Unmappable reports pass through untouched.
+ */
+export function toLegacyInput(data: string): string {
+	// Plain typing (the common case) and bracketed paste need no rewriting: pasted
+	// text must reach the PTY verbatim even if it contains CSI-u lookalikes.
+	if (!data.includes("\x1b[") || data.includes("\x1b[200~")) return data;
+	return data.replace(KEY_REPORT_REGEX, (sequence) => {
+		const keyId = parseKey(sequence);
+		if (!keyId) return sequence;
+		if (keyId.length === 1) return keyId;
+		const legacy = encodeKeyToken(keyId);
+		return legacy === keyId ? sequence : legacy;
+	});
 }
 
 export type InputSpec = string | { text?: string; keys?: string[]; paste?: string; hex?: string[] };
