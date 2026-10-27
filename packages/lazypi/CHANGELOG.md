@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.8.0 — 2026-10-27
 
 - Drop `pi-tool-display`: zentui 0.31+ ships its own Tool display adapted from pi-tool-display 0.5.0, so the fork's increments (apply_patch and hashline rendering) had lost their targets anyway. The `ui` preset now enables zentui's `toolDisplay` with the `opencode` preset, keeps `registerToolOverrides.read: false`, and grants the explicit Bash renderer consent. Catalog matches a 10-extension snapshot.
 - Drop `token-speed`: zentui 0.30+ renders Tokens/s natively (`$token_rate` in Editor/Footer templates, `segments.tokenRate` in the working line) from Pi's own events, so the separate status item and its three `extensionStatuses.tokenSpeed` entries are gone. The `ui` preset now enables `segments.tokenRate` explicitly. Catalog matches an 11-extension snapshot.

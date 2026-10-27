@@ -1,6 +1,6 @@
 {
   "name": "@moguw/lazypi",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Template Pi extension manager and catalog installer.",
   "license": "MIT",
   "type": "module",
