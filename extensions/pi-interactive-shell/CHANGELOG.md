@@ -2,7 +2,10 @@
 
 All notable changes to the `pi-interactive-shell` extension will be documented in this file.
 
-## [Unreleased]
+## [0.16.2] - 2026-10-27
+
+### Fixed
+- Translate Kitty CSI-u and xterm modifyOtherKeys reports into legacy key bytes before writing to the PTY, so inner legacy apps no longer echo stray text such as `3;5u` when Pi enables the Kitty keyboard protocol. Plain typing and bracketed paste are not rewritten.
 
 ## [0.16.1] - 2026-10-08
 
