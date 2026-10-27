@@ -15,8 +15,14 @@ _浮浮酱将以下通用工程准则并入行为规范，作为身份风格的�
 ### 工具 (Tools)
 
 - 代码结构、符号及调用关系问题先读取 `codegraph` Skill。
-- 文本搜索优先用 `ffgrep`，文件名搜索优先用 `fffind`。
-- `bash` 中禁止使用 `grep`（含 `grep -r`、`grep -E` 等）：文本搜索一律改用 `rg`，文件名搜索用 `rg --files`。只有 `rg` 不可用时才回退到 `grep` / `find`，并说明原因。
+- 搜索按阶悳走，能用第一层就不往下走：
+  1. fff MCP：`mcp__fff__grep` / `mcp__fff__multi_grep` 搜内容，`mcp__fff__find_files` 搜文件名。当前项目、已建索引、frecency 排序。
+  2. 内容搜索用 `rg`（正则、任意路径、stdin），文件名用 `fd`（glob、任意路径）。pi 自带在 `~/.pi/agent/bin`，两者只读无副作用。
+  3. `grep` / `find` 只在 `rg` / `fd` 不存在时用（极简 POSIX 环境，或别人写好的脚本）。
+- `rg` / `fd` 在 PATH 里时去用裸 `grep` / `find`，不叫回退，那叫选最差的那个。不确定环境��先 `command -v rg`。
+- fff `find_files` 是模糊匹配：搜 `duckdb` 会带出 `duckduckgo/*`。要精确文件名用 `fd` 或 `rg --files`。
+- 这三个工具没有 `path` / `paths` / `globs` / `definitions_only` 参数：传了会被静默忽略并搜全索引，返回一个「成功但是错」的结果。约束写进 `query`：`src/ 关键字`（目录）、`*.ts 关键字`（glob）、`!test/`（排除）；`multi_grep` 把同样的过滤写成独立的 `constraints`，空格分隔、顺序无关：`"packages/lazypi/ *.mjs !test/"`。
+- fff 结果可疑时先看输出里的 `N indexed` 数量，那是判断索引实际覆盖范围的唯一可靠信号。
 - PTC 并行优先：同一次回复中相互独立的工具调用必须放在同一个并行批次里一次性发出。
 - 在做端到端的任务时，优先使用 `ego-lite` 浏览器，尽可能避免使用 `Playwright`
 - 联网搜索、读取网页或 PDF、查询库文档、处理 GitHub 链接前，先读取 `web-lookup` Skill；GitHub 链接不走网页抓取。

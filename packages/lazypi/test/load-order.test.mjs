@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { PACKAGES, normalizePackageLoadOrderInSettings } from "../bin/lazypi.mjs";
+import { normalizePackageLoadOrderInSettings } from "../bin/lazypi.mjs";
 
 const catalog = [
 	{ id: "settings", source: "npm:settings", loadBefore: ["powerbar"] },
@@ -38,16 +38,4 @@ test("catalog load constraints detect cycles without reordering", () => {
 	const settings = { packages: ["npm:b", "npm:a"] };
 	assert.equal(normalizePackageLoadOrderInSettings(settings, cyclicCatalog), false);
 	assert.deepEqual(settings.packages, ["npm:b", "npm:a"]);
-});
-
-test("fff installs and loads before hashline-edit-pro, preserving package filters", () => {
-	const fffIndex = PACKAGES.findIndex((pkg) => pkg.id === "fff");
-	const hashlineIndex = PACKAGES.findIndex((pkg) => pkg.id === "hashline-edit-pro");
-	assert.ok(fffIndex < hashlineIndex, "fff should precede hashline-edit-pro in the catalog");
-	assert.ok(PACKAGES[fffIndex].loadBefore?.includes("hashline-edit-pro"));
-	const filtered = { source: "npm:@ff-labs/pi-fff", skills: [] };
-	const settings = { packages: ["npm:@moguw/pi-hashline-edit-pro", filtered] };
-	assert.equal(normalizePackageLoadOrderInSettings(settings), true);
-	assert.deepEqual(settings.packages, [filtered, "npm:@moguw/pi-hashline-edit-pro"]);
-	assert.equal(normalizePackageLoadOrderInSettings(settings), false);
 });

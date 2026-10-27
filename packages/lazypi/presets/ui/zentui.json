@@ -39,13 +39,7 @@
     "userMessages": {
       "enabled": true,
       "style": "framed",
-      "colorSource": "theme",
-      "styles": {
-        "framed": {},
-        "framed-copy-friendly": {},
-        "compact": {},
-        "labeled": {}
-      }
+      "colorSource": "theme"
     },
     "workingLine": {
       "enabled": true,
@@ -81,7 +75,8 @@
         "tool": true,
         "elapsed": true,
         "thought": true,
-        "tokens": true
+        "tokens": true,
+        "tokenRate": true
       }
     },
     "selectorBorders": {
@@ -143,11 +138,7 @@
           "extensionStatuses": {
             "defaultPlacement": "off",
             "placements": {
-              "ponytail": "left",
-              "tokenSpeed": "right"
-            },
-            "colorModes": {
-              "tokenSpeed": "zentui"
+              "ponytail": "left"
             }
           }
         }
@@ -158,9 +149,14 @@
       "enabled": true,
       "mode": "tree"
     },
-    "extensionStatuses": {
-      "visibility": {
-        "tokenSpeed": "show"
+    "toolDisplay": {
+      "enabled": true,
+      "style": "opencode",
+      "registerToolOverrides": {
+        "read": false
+      },
+      "builtinRendererOverrides": {
+        "bash": true
       }
     }
   }

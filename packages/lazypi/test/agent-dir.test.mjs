@@ -127,17 +127,17 @@ test("update and remove inspect the custom global settings", (t) => {
 	const customAgentDir = join(home, ".pi", "lazy");
 	writeFakePi(bin);
 	writeSettings(defaultAgentDir, ["npm:pi-subagents"]);
-	writeSettings(customAgentDir, ["npm:pi-mcp-adapter", "npm:@moguw/pi-openai-tools"]);
+	writeSettings(customAgentDir, ["npm:pi-mcp-adapter", "npm:@moguw/pi-advisor"]);
 
 	const updateResult = runCli(["update"], { cwd: workspace, home, agentDir: customAgentDir, bin, callsPath });
 	assert.equal(updateResult.status, 0, `STDOUT:\n${updateResult.stdout}\nSTDERR:\n${updateResult.stderr}`);
-	assert.deepEqual(JSON.parse(readFileSync(join(customAgentDir, "settings.json"), "utf8")).packages, ["npm:pi-mcp-adapter", "npm:@moguw/pi-openai-tools"]);
+	assert.deepEqual(JSON.parse(readFileSync(join(customAgentDir, "settings.json"), "utf8")).packages, ["npm:pi-mcp-adapter", "npm:@moguw/pi-advisor"]);
 	assert.deepEqual(JSON.parse(readFileSync(join(defaultAgentDir, "settings.json"), "utf8")).packages, ["npm:pi-subagents"]);
 
-	const removeResult = runCli(["remove", "openai-tools"], { cwd: workspace, home, agentDir: customAgentDir, bin, callsPath });
+	const removeResult = runCli(["remove", "advisor"], { cwd: workspace, home, agentDir: customAgentDir, bin, callsPath });
 	assert.equal(removeResult.status, 0, `STDOUT:\n${removeResult.stdout}\nSTDERR:\n${removeResult.stderr}`);
 	const calls = readFileSync(callsPath, "utf8").trim().split(/\r?\n/).filter(Boolean);
-	assert.deepEqual(calls, ["update", "remove npm:@moguw/pi-openai-tools"]);
+	assert.deepEqual(calls, ["update", "remove npm:@moguw/pi-advisor"]);
 });
 
 test("--local settings remain independent of PI_CODING_AGENT_DIR", (t) => {

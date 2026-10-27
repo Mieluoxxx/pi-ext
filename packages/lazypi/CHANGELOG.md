@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Drop `pi-tool-display`: zentui 0.31+ ships its own Tool display adapted from pi-tool-display 0.5.0, so the fork's increments (apply_patch and hashline rendering) had lost their targets anyway. The `ui` preset now enables zentui's `toolDisplay` with the `opencode` preset, keeps `registerToolOverrides.read: false`, and grants the explicit Bash renderer consent. Catalog matches a 10-extension snapshot.
+- Drop `token-speed`: zentui 0.30+ renders Tokens/s natively (`$token_rate` in Editor/Footer templates, `segments.tokenRate` in the working line) from Pi's own events, so the separate status item and its three `extensionStatuses.tokenSpeed` entries are gone. The `ui` preset now enables `segments.tokenRate` explicitly. Catalog matches an 11-extension snapshot.
+- Drop `pi-session-migrate` from the catalog and the repo. A relocated project now keeps its old session records; the catalog matches a 12-extension `pi list` snapshot.
+- Drop `hashline-edit-pro` from the catalog and the repo. Its `replace`/`insert`/`undo` tools were re-exposed as `deferred` and went 27 days without a single call, while `edit` stayed at ~28 calls/day; `read` gave up 7.9% of its output to anchors that nothing consumed. The catalog now matches a 13-extension `pi list` snapshot. Removing it also retires the tool-display `postInstall` rule that only existed to keep `read` rendering out of tool-display's hands.
+- Drop `openai-tools` from the catalog: the package was removed from the monorepo, and its `apply_patch` entry only duplicated the editing tools that `hashline-edit-pro` already registers.
+- Drop `fff` from the catalog: FFF now ships as an MCP server, not as a Pi extension, so the `tools-and-ui` mode file and the `loadBefore` gate on `hashline-edit-pro` are gone. The catalog now covers a 14-extension `pi list` snapshot.
+
 ## 0.7.0 — 2026-10-03
 
 - Sync the catalog with the maintainer's current `pi list` snapshot: 16 extensions. `advisor` now installs `@moguw/pi-advisor` (derived from `rpiv-mono`'s rpiv-advisor) instead of `pi-omp-advisor`, and refuses both `pi-omp-advisor` and `@juicesharp/rpiv-advisor` as legacy conflicts. Add `token-speed` (`pi-token-speed`) and `stats-dashboard` (`@moguw/pi-stats-dashboard`). Drop `web-access`, `lazy-tools` and `computer-use`, which are no longer installed, and with them the `lazy-tools` load-order gates (fff still loads before hashline-edit-pro).

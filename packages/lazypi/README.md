@@ -37,29 +37,22 @@ npx @moguw/lazypi --local                  # install into .pi/settings.json of t
 
 ### Portable package sources
 
-The extension set follows a 16-extension `pi list` snapshot, normalizing nine local [pi-ext](https://github.com/Mieluoxxx/pi-ext) checkouts to their `@moguw` npm package sources. Four existing file entries (AGENTS, the two Vesper themes and `vision.json`) remain separate from that extension list. npm sources remain unpinned; package-name parity is not a guarantee of byte-for-byte version parity. Publish new package versions before releasing a LazyPi catalog that requires them.
+The extension set follows the approved 10-extension `pi list` snapshot, normalizing five local [pi-ext](https://github.com/Mieluoxxx/pi-ext) checkouts to their `@moguw` npm package sources. Four existing file entries (AGENTS, the two Vesper themes and `vision.json`) remain separate from that extension list. npm sources remain unpinned; package-name parity is not a guarantee of byte-for-byte version parity. Publish new package versions before releasing a LazyPi catalog that requires them.
 
 | Catalog id | Category | Pi install source |
 | --- | --- | --- |
 | `advisor` | `core` | `npm:@moguw/pi-advisor` |
-| `tool-display` | `ui` | `npm:@moguw/pi-tool-display` |
-| `token-speed` | `ui` | `npm:pi-token-speed` |
 | `stats-dashboard` | `ui` | `npm:@moguw/pi-stats-dashboard` |
 | `interactive-shell` | `tools` | `npm:@moguw/pi-interactive-shell` |
-| `hashline-edit-pro` | `tools` | `npm:@moguw/pi-hashline-edit-pro` |
 | `session-rename` | `herdr` | `npm:@moguw/pi-session-rename` |
-| `session-migrate` | `herdr` | `npm:@moguw/pi-session-migrate` |
 | `session-fork` | `herdr` | `npm:@moguw/pi-session-fork` |
-| `openai-tools` | `codex` | `npm:@moguw/pi-openai-tools` |
 
 The old `subagents`, TPS, Recap, CodeGraph extension, Simplify, Context7, standalone `apply-patch`, `web-access`, `lazy-tools` and `computer-use` entries are no longer selected by this catalog; `advisor` now refers to `@moguw/pi-advisor`, not `pi-omp-advisor` or `@juicesharp/rpiv-advisor`. CodeGraph remains an independently installed CLI/Skill workflow, not a catalog extension.
 
-Catalog updates do **not** migrate existing local-path registrations or uninstall removed entries. Migrate those registrations explicitly when ready; the catalog change does not alter your running Pi. Installs conservatively check global and current-project registrations for the declared old Advisor / standalone apply-patch sources (including pinned forms) when their replacements are selected; the other scope is only read, never rewritten. This is a guard for known source strings, not a detector for every local checkout, resource filter, trust decision or other project.
+Catalog updates do **not** migrate existing local-path registrations or uninstall removed entries. Migrate those registrations explicitly when ready; the catalog change does not alter your running Pi. Installs conservatively check global and current-project registrations for the declared old Advisor sources (including pinned forms) when their replacements are selected; the other scope is only read, never rewritten. This is a guard for known source strings, not a detector for every local checkout, resource filter, trust decision or other project.
 
 ### Newly aligned tools
 
-- **[OpenAI tools](https://github.com/Mieluoxxx/pi-ext/tree/main/extensions/pi-openai-tools)** combines context management, remote compaction, Astra compatibility and `apply_patch`. Image generation is disabled by default. Remove or disable standalone `pi-apply-patch` before loading this package; gateway/model support still needs separate verification. Per-package resource filters (the object form in `settings.json` `packages`) are applied by Pi itself and stay out of scope for LazyPi.
-- **[Token speed](https://www.npmjs.com/package/pi-token-speed)** renders live generation speed; the `ui` preset places it in the zentui footer and turns on its visibility.
 - **[Stats dashboard](https://github.com/Mieluoxxx/pi-ext/tree/main/extensions/pi-stats-dashboard)** aggregates local `/stats` usage: lifetime/today/7d/30d tokens, costs and model/project/tool distributions from persisted session JSONL.
 - **[pi-advisor](https://github.com/Mieluoxxx/pi-ext/tree/main/extensions/pi-advisor)** runs independent advisor consultations with stable cache prefixes, budget metering, timeouts and opt-in completion review; it is derived from `rpiv-mono`'s rpiv-advisor. Its model selection lives in `~/.config/rpiv-advisor/advisor.json`, outside the agent directory — copy that file manually when replicating; `WATCHDOG.yml` belongs to the retired pi-omp-advisor and is not part of this catalog.
 
@@ -83,8 +76,8 @@ Presets install their catalog requirements and apply configuration files in one 
 | Preset | Configuration |
 | --- | --- |
 | `base` | Global AGENTS.md, `xhigh` default thinking, default tools (`+codemode`, `+tool_search`), transcript-search shortcut, MCP servers |
-| `ui` | Zentui preferences, tool-display, token-speed, stats dashboard, Vesper theme files; follows the `system` theme |
-| `workflow` | Workspace history, Goal (100 automatic turns), deferred interactive shell, FFF `tools-and-ui`, hashline editing, automatic naming |
+| `ui` | Zentui preferences including its native Tool display and Tokens/s, stats dashboard, Vesper theme files; follows the `system` theme |
+| `workflow` | Workspace history, Goal (100 automatic turns), deferred interactive shell, automatic naming |
 | `models` | Local CPA proxy provider catalog (`merge-models`), default provider and model; every `apiKey` is a `$CPA_API_KEY` environment reference |
 
 ```bash
@@ -155,7 +148,7 @@ Validate everything before installing. With presets, catalog files and compatibi
 
 Pi package installation can change `settings.json`: the preset writer rereads it and preserves new package entries and unrelated fields. Concurrent changes to managed fields stop application. Avoid applying while other processes edit configuration. Local-path registrations matching a missing npm requirement must be migrated explicitly before applying; LazyPi does not uninstall them automatically.
 
-Restart Pi after applying; not all extension settings support hot reload. If `PI_FFF_MODE` is set, it takes precedence over `pi-fff.json`; unset it to use the preset. Removing `--preset` from a later command does not undo earlier writes. No background synchronization, ownership database or automatic preset removal is provided. Presets are trusted configuration, not a sandbox: never distribute credentials or unreviewed command-bearing settings.
+Restart Pi after applying; not all extension settings support hot reload. Removing `--preset` from a later command does not undo earlier writes. No background synchronization, ownership database or automatic preset removal is provided. Presets are trusted configuration, not a sandbox: never distribute credentials or unreviewed command-bearing settings.
 
 ## Build your own LazyPi
 

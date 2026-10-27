@@ -86,10 +86,8 @@ test("built-in and external presets merge once, preserve resources, and detect d
 	assert.equal(merged.defaultModel, "private-model");
 	assert.deepEqual(merged.other, { enabled: true });
 	assert.deepEqual(merged.packages[0], customPackage);
-	assert.ok(merged.packages.indexOf(source("fff")) < merged.packages.indexOf(source("hashline-edit-pro")));
 	assert.equal(json(join(state.agentDir, "zentui.json")).components.footer.styles.starship.compactMaxLines, 3);
 	assert.equal(json(join(state.agentDir, "zentui.json")).components.workingLine.messages.values.length, 16);
-	assert.equal(json(join(state.agentDir, "extensions/pi-tool-display/config.json")).registerToolOverrides.read, false);
 	assert.equal(readFileSync(join(state.agentDir, "AGENTS.md"), "utf8"), readFileSync("agent/AGENTS.md", "utf8"));
 	assert.equal(backups(state).filter((name) => name.startsWith("settings.json.")).length, 1);
 	const firstBackups = backups(state);
@@ -118,10 +116,10 @@ test("dry-run works without Pi and performs no configuration writes", (t) => {
 test("installs only preset requirements and rebases over Pi settings updates", (t) => {
 	const state = workspace(t);
 	writeJson(join(state.agentDir, "settings.json"), { packages: ["npm:keep"], defaultThinkingLevel: "medium" });
-	const file = preset(state, "custom", [{ to: "agent/settings.json", value: { defaultThinkingLevel: "high" } }], ["fff"]);
+	const file = preset(state, "custom", [{ to: "agent/settings.json", value: { defaultThinkingLevel: "high" } }], ["vision"]);
 	success(run(state, ["--preset", file, "--only", "goal", "--yes"]));
 	const settings = json(join(state.agentDir, "settings.json"));
-	assert.deepEqual(settings.packages, ["npm:keep", source("goal"), source("fff")]);
+	assert.deepEqual(settings.packages, ["npm:keep", source("goal"), source("vision")]);
 	assert.equal(settings.installerNote, "preserve this new field");
 	assert.equal(settings.defaultThinkingLevel, "high");
 	assert.equal(readFileSync(state.calls, "utf8").trim().split("\n").length, 2);
@@ -131,8 +129,8 @@ test("package failures and managed-field races leave all preset files unapplied"
 	for (const fail of [true, false]) {
 		const state = workspace(t);
 		writeJson(join(state.agentDir, "settings.json"), { defaultThinkingLevel: "medium" });
-		const file = preset(state, "custom", [{ to: "agent/settings.json", value: { defaultThinkingLevel: "high" } }], ["fff"]);
-		const result = run(state, ["--preset", "base", "--preset", file, "--yes"], fail ? { PI_TEST_FAIL_SOURCE: source("fff") } : { PI_TEST_MUTATE: "1" });
+		const file = preset(state, "custom", [{ to: "agent/settings.json", value: { defaultThinkingLevel: "high" } }], ["vision"]);
+		const result = run(state, ["--preset", "base", "--preset", file, "--yes"], fail ? { PI_TEST_FAIL_SOURCE: source("vision") } : { PI_TEST_MUTATE: "1" });
 		assert.notEqual(result.status, 0);
 		assert.equal(existsSync(join(state.agentDir, "AGENTS.md")), false);
 		assert.equal(existsSync(join(state.agentDir, "keybindings.json")), false);
@@ -143,7 +141,7 @@ test("package failures and managed-field races leave all preset files unapplied"
 
 test("unsafe flags and exclusions fail before package or config operations", (t) => {
 	const state = workspace(t);
-	for (const args of [["--local"], ["--force"], ["--except", "global-agents"], ["--only", "fff", "--except", "fff"]]) {
+	for (const args of [["--local"], ["--force"], ["--except", "global-agents"], ["--only", "vision", "--except", "vision"]]) {
 		assert.notEqual(run(state, ["--preset", "base", ...args, "--yes"]).status, 0);
 	}
 	for (const args of [["update", "--preset", "base"], ["--preset"], ["--preset="], ["--dry-run"]]) assert.notEqual(run(state, args).status, 0);
@@ -170,7 +168,7 @@ test("preflight rejects unsafe targets, settings aliases, modes and private pars
 		{ to: "agent/custom.json", value: "[]" },
 	];
 	for (const entry of cases) {
-		const file = preset(state, "invalid", [entry], ["fff"]);
+		const file = preset(state, "invalid", [entry], ["vision"]);
 		const result = run(state, ["--preset", file, "--yes"]);
 		assert.notEqual(result.status, 0, JSON.stringify(entry));
 		assert.doesNotMatch(result.stdout + result.stderr, /DO-NOT-PRINT-THIS/);
@@ -179,14 +177,13 @@ test("preflight rejects unsafe targets, settings aliases, modes and private pars
 	assert.equal(existsSync(state.calls), false);
 });
 
-test("target casing aliases, mixed modes and catalog compatibility conflicts are rejected", (t) => {
+test("target casing aliases and mixed modes are rejected", (t) => {
 	const state = workspace(t);
 	for (const files of [
 		[{ to: "agent/Custom.json", value: {} }, { to: "agent/custom.json", value: {} }],
 		[{ to: "agent/custom.json", value: {} }, { to: "agent/custom.json", mode: "copy", value: {} }],
-		[{ to: "agent/extensions/pi-tool-display/config.json", value: { registerToolOverrides: { read: true } } }],
 	]) {
-		const file = preset(state, "conflict", files, ["tool-display", "hashline-edit-pro"]);
+		const file = preset(state, "conflict", files, ["vision"]);
 		assert.notEqual(run(state, ["--preset", file, "--yes"]).status, 0);
 	}
 	assert.deepEqual(readdirSync(state.agentDir), []);
@@ -195,7 +192,7 @@ test("target casing aliases, mixed modes and catalog compatibility conflicts are
 
 test("manifest validation and source confinement happen before installation", (t) => {
 	const state = workspace(t);
-	const file = preset(state, "invalid", [{ to: "agent/custom.json", value: {} }], ["fff"]);
+	const file = preset(state, "invalid", [{ to: "agent/custom.json", value: {} }], ["vision"]);
 	const original = json(file);
 	for (const manifest of [{ ...original, version: 2 }, { ...original, packages: ["unknown"] }, { ...original, execute: "command" }, { ...original, files: [{ ...original.files[0], from: "../outside.json" }] }]) {
 		writeJson(file, manifest);
@@ -291,11 +288,11 @@ test("ordered merges handle type replacements without resurrecting old fields", 
 
 test("local package duplicates block both preview and installation", (t) => {
 	const state = workspace(t);
-	const checkout = join(state.root, "local-fff");
+	const checkout = join(state.root, "local-vision");
 	mkdirSync(checkout);
-	writeJson(join(checkout, "package.json"), { name: "@ff-labs/pi-fff" });
+	writeJson(join(checkout, "package.json"), { name: "@getpipher/vision" });
 	writeJson(join(state.agentDir, "settings.json"), { packages: [checkout] });
-	const file = preset(state, "custom", [], ["fff"]);
+	const file = preset(state, "custom", [], ["vision"]);
 	for (const flag of ["--dry-run", "--yes"]) {
 		const result = run(state, ["--preset", file, flag]);
 		assert.notEqual(result.status, 0);
@@ -348,7 +345,7 @@ test("base preset copies the portable mcp servers", (t) => {
 
 test("replacement packages refuse known legacy conflicts without uninstalling them", (t) => {
 	const state = workspace(t);
-	for (const [id, legacy] of [["advisor", "npm:@juicesharp/rpiv-advisor@1.0.0"], ["advisor", "npm:pi-omp-advisor"], ["openai-tools", "git:github.com/code-yeongyu/pi-apply-patch@v0.1.2"], ["openai-tools", "https://github.com/code-yeongyu/pi-apply-patch.git@v0.1.2"]]) {
+	for (const [id, legacy] of [["advisor", "npm:@juicesharp/rpiv-advisor@1.0.0"], ["advisor", "npm:pi-omp-advisor"]]) {
 		writeJson(join(state.agentDir, "settings.json"), { packages: [legacy] });
 		const file = preset(state, "legacy-conflict", [], [id]);
 		for (const args of [["--only", id, "--yes"], ["--preset", file, "--dry-run"], ["--preset", file, "--yes"]]) {
@@ -450,13 +447,13 @@ test("invalid model collections fail preflight without replacing existing data",
 		'{"providers":{"secret":"PRIVATE-PARSE-SENTINEL" broken}}',
 	];
 	for (const value of invalid) {
-		const file = preset(state, "invalid-models", [{ to: "agent/models.json", mode: "merge-models", value }], ["fff"]);
+		const file = preset(state, "invalid-models", [{ to: "agent/models.json", mode: "merge-models", value }], ["vision"]);
 		const result = run(state, ["--preset", file, "--yes"]);
 		assert.notEqual(result.status, 0);
 		assert.doesNotMatch(result.stdout + result.stderr, /PRIVATE-PARSE-SENTINEL/);
 		assert.equal(readFileSync(target, "utf8"), original);
 	}
-	const valid = preset(state, "valid-models", [{ to: "agent/models.json", mode: "merge-models", value: { providers: { keep: { models: [] } } } }], ["fff"]);
+	const valid = preset(state, "valid-models", [{ to: "agent/models.json", mode: "merge-models", value: { providers: { keep: { models: [] } } } }], ["vision"]);
 	for (const value of ["{broken", '{"providers":{"keep":{"models":[{"id":"same"},{"id":"same"}]}}}']) {
 		writeFileSync(target, value);
 		assert.notEqual(run(state, ["--preset", "base", "--preset", valid, "--yes"]).status, 0);

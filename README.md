@@ -12,12 +12,8 @@
 | 名称 | 设计意图 | 源仓库地址 @ commit |
 | --- | --- | --- |
 | `pi-session-rename` | 为未命名会话自动生成上下文名称；Herdr tab 同步 | - |
-| `pi-session-migrate` | 项目移动后以“拷贝 + 引用改写”找回悬空会话 | - |
 | `pi-session-fork` | `/btw` inline 进入上下文、`/btw` outline 用只读快照直调模型不打扰会话；`/btw` 能够 fork 会话并实现 Herdr 分屏 | - |
 | `pi-interactive-shell` | 改进原本的命令，提升 Agent 工具调用正确率 | [nicobailon/pi-interactive-shell](https://github.com/nicobailon/pi-interactive-shell) @ `77df9a8`（v0.17.0，同步水位线见扩展 README 的 Upstream sync） |
-| `pi-tool-display` | 增加对 MCP 工具、Apply Patch 工具的渲染 | [MasuRii/pi-tool-display](https://github.com/MasuRii/pi-tool-display) @ `91cef75`（v0.5.0） |
-| `pi-hashline-edit-pro` | 增加 `disabledTools` 配置，可禁用与其它扩展冲突的工具；锚点编辑工具以 `deferred` 暴露，由 `tool_search` 按需加载 | [YuGiMob/pi-hashline-edit-pro](https://github.com/YuGiMob/pi-hashline-edit-pro) @ `77d545e`（v2.7.2，本地 patch 分支 `local/disabled-tools`） |
-| `pi-openai-tools` | 上下文窗口、远程压缩 v2、图像生成/编辑、Astra 兼容及 apply_patch；不含托管搜索或 auto 审查 | [awoaCrim/pi-openai-toolkit](https://github.com/awoaCrim/pi-openai-toolkit) v0.14.5 源码快照（无 Git 元数据）；[code-yeongyu/pi-apply-patch](https://github.com/code-yeongyu/pi-apply-patch) @ `8f0d8a6` |
 | `pi-advisor` | 独立 advisor 咨询：稳定缓存前缀、费用计量、预算和锚点裁剪、按收益保活；同模型直接禁用 | 派生自 [juicesharp/rpiv-mono](https://github.com/juicesharp/rpiv-mono) 的 rpiv-advisor 2.11.0；[包文档](extensions/pi-advisor/README.md) |
 | `pi-stats-dashboard` | 本地 `/stats` 用量面板：扫描持久化会话 JSONL，聚合 lifetime/today/7d/30d 令牌、费用及模型/项目/工具分布，并统计用户消息行为信号 | [suryavamsi6/pi-stats-dashboard](https://github.com/suryavamsi6/pi-stats-dashboard) @ `3ee97be`（v0.1.3 + HEAD 未发布的 token 分类展示改动） |
 | `@moguw/lazypi` | 扩展管理 CLI（非扩展包，位于 `packages/lazypi`）：按 `PACKAGES` 目录安装、审计、更新、移除扩展，并用可组合预设写入 agent 配置 | 本仓库 `packages/lazypi`，源自作者 fork 的 [Mieluoxxx/LazyPi](https://github.com/Mieluoxxx/LazyPi) |
@@ -36,13 +32,9 @@ pnpm run check
 ```bash
 pi -e ./extensions/pi-advisor
 pi -e ./extensions/pi-session-rename
-pi -e ./extensions/pi-session-migrate
 pi -e ./extensions/pi-interactive-shell
-pi -e ./extensions/pi-tool-display
 pi -e ./extensions/pi-stats-dashboard
 ```
-
-`pi-openai-tools` 的配置、默认关闭项与迁移步骤见[包文档](extensions/pi-openai-tools/README.md)。使用前先移除或禁用独立 `git:github.com/code-yeongyu/pi-apply-patch`，再按文档安装本地包，避免同名工具冲突；本仓库不会自动安装或启用它。
 
 `lazypi` 是 workspace 里的管理 CLI，发布为 `@moguw/lazypi`，不在 `pi -e` 试用范围内：
 
