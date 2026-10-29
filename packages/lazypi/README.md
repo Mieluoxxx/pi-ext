@@ -65,9 +65,25 @@ npx @moguw/lazypi install --preset all --yes
 export CPA_API_KEY=<the local proxy key>   # same value as the maintainer's models.json apiKey
 ```
 
-Boundaries the presets do not cover: the CPA proxy itself must run on `localhost:8317` — it is not shipped. The `cua` MCP entry is stored in portable form (`~/.local/bin/cua-driver`, `${HOME}/.cua-driver/policy.yaml`) and degrades gracefully when the driver is absent. pi-advisor's model selection lives in `~/.config/rpiv-advisor/advisor.json`, outside the agent directory: copy it manually (the file contains no credentials) or run `/advisor` once on the new machine — without it, `advisor()` reports "No advisor model is configured" instead of consulting. Sessions, project trust and credentials stay device-local.
+Boundaries the presets do not cover: the CPA proxy itself must run on `localhost:8317` — it is not shipped. `cua` is an advisory MCP recommendation rather than a preset write, so install `cua-driver` yourself when you want it. pi-advisor's model selection lives in `~/.config/rpiv-advisor/advisor.json`, outside the agent directory: copy it manually (the file contains no credentials) or run `/advisor` once on the new machine — without it, `advisor()` reports "No advisor model is configured" instead of consulting. Sessions, project trust and credentials stay device-local.
 
 `web-access` is no longer part of this catalog. The dedicated `web-search` preset target remains available for custom presets and follows the extension's lookup: `PI_CODING_AGENT_DIR/web-search.json`, otherwise `XDG_CONFIG_HOME/pi/web-search.json`, otherwise `~/.pi/web-search.json`.
+
+## Recommended integrations
+
+MCP servers and skills are advisory: LazyPi never writes them. `install` prints the exact command for every recommendation that is missing, and `doctor` reports the same list without failing. Both checks read `~/.pi/agent/mcp.json`, the project `.pi/mcp.json`, `~/.pi/agent/settings.json` and `~/.agents/skills/` to decide what is already present.
+
+| Kind | Default recommendation | Added with |
+| --- | --- | --- |
+| MCP | `context7`, `exa`, `firecrawl`, and `cua` (macOS only) | `pi mcp add <name> …` |
+| Skill | Anthropic skills collection | `pi install git:github.com/anthropics/skills` |
+| Skill | Pi skills collection | `git clone --depth 1 https://github.com/badlogic/pi-skills ~/.agents/skills/pi-skills` |
+| Skill | Impeccable design workflow | `npx impeccable install` |
+| Skill | pstack engineering workflow | sparse-clone `cursor/plugins`, copy `pstack` into `~/.agents/skills/` |
+
+Edit `MCP_RECOMMENDATIONS` and `SKILL_RECOMMENDATIONS` next to `PACKAGES` to change the list. Recommendations are not catalog entries: they never appear in `status`, are not installed by `--force`, and never make `doctor` fail.
+
+`anthropics/skills` ships a large set; narrow it with the object form of `settings.packages` (for example `"skills": ["+skills/pdf"]`) if the descriptions crowd the prompt.
 
 ## Composable configuration presets
 
@@ -75,7 +91,7 @@ Presets install their catalog requirements and apply configuration files in one 
 
 | Preset | Configuration |
 | --- | --- |
-| `base` | Global AGENTS.md, `xhigh` default thinking, default tools (`+codemode`, `+tool_search`), transcript-search shortcut, MCP servers |
+| `base` | Global AGENTS.md, `xhigh` default thinking, default tools (`+codemode`, `+tool_search`), transcript-search shortcut |
 | `ui` | Zentui preferences including its native Tool display and Tokens/s, stats dashboard, Vesper theme files; follows the `system` theme |
 | `workflow` | Workspace history, Goal (100 automatic turns), deferred interactive shell, automatic naming |
 | `models` | Local CPA proxy provider catalog (`merge-models`), default provider and model; every `apiKey` is a `$CPA_API_KEY` environment reference |
@@ -122,7 +138,7 @@ Presets apply left to right over existing configuration. Later presets override 
 - `copy`: whole-file snapshot for Markdown/YAML (or JSON); existing content is backed up, not merged. Conflicting modes or target casing aliases are rejected.
 - `agent/...`: a configuration path under the resolved agent directory, with nested paths preserved. `web-search` is the dedicated extension-specific target described above.
 - `settings.json` requires merge mode. Presets cannot write resource-registration arrays, trust defaults or selected runtime fields. Catalog compatibility requirements still apply; an explicit conflicting preference fails preflight.
-- Built-in presets are `base`, `ui`, `workflow` and `models`. Credential import and Skills distribution remain deferred pending catalog/distribution and routing decisions. `models.json` requires `merge-models`; ordinary merge/copy and noncanonical casing cannot bypass this rule. Auth/trust files, state, caches, installation directories, logs/backups and executable extension files remain forbidden targets.
+- Built-in presets are `base`, `ui`, `workflow` and `models`. Credential import and skill distribution stay out of presets: skills are recommended through Pi package sources instead (see [Recommended integrations](#recommended-integrations)). `models.json` requires `merge-models`; ordinary merge/copy and noncanonical casing cannot bypass this rule. Auth/trust files, state, caches, installation directories, logs/backups and executable extension files remain forbidden targets.
 
 ### Custom model presets
 

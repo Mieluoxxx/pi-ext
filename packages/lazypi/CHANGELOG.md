@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.0 — 2026-10-29
+
+- Stop writing `mcp.json` from the `base` preset. MCP servers and skills are now advisory: `install` prints the exact `pi mcp add` / `pi install` / `git clone` / `npx` command for each missing recommendation, and `doctor` lists them as non-fatal warnings. Skill recommendations cover the Anthropic and Pi collections plus `impeccable` and `pstack`. Configured state is detected from the user and project `mcp.json`, both settings scopes, and `~/.agents/skills` / `~/.pi/agent/skills`, so local-only servers (`apple-notes`, `fff`) and user edits no longer drift or get overwritten. Edit `MCP_RECOMMENDATIONS` and `SKILL_RECOMMENDATIONS` next to `PACKAGES` to change the list.
+
 ## 0.8.0 — 2026-10-27
 
 - Drop `pi-tool-display`: zentui 0.31+ ships its own Tool display adapted from pi-tool-display 0.5.0, so the fork's increments (apply_patch and hashline rendering) had lost their targets anyway. The `ui` preset now enables zentui's `toolDisplay` with the `opencode` preset, keeps `registerToolOverrides.read: false`, and grants the explicit Bash renderer consent. Catalog matches a 10-extension snapshot.

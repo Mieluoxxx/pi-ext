@@ -94,6 +94,77 @@ function fileInstallNeeded(pkg) {
 }
 
 // ---------------------------------------------------------------------------
+// Recommended integrations
+// ---------------------------------------------------------------------------
+// Advisory only: LazyPi never writes these. `install` and `doctor` report what
+// is missing and print the exact command that adds it.
+const MCP_RECOMMENDATIONS = [
+	{ name: "context7", description: "库与框架文档检索", args: ["--url", "https://mcp.context7.com/mcp", "--bearer-token-env-var", "CONTEXT7_API_KEY"] },
+	{ name: "exa", description: "网页搜索与页面抓取", args: ["--url", "https://mcp.exa.ai/mcp", "--bearer-token-env-var", "EXA_API_KEY"] },
+	{ name: "firecrawl", description: "站点爬取与 PDF 解析", args: ["--url", "https://mcp.firecrawl.dev/v2/mcp", "--bearer-token-env-var", "FIRECRAWL_API_KEY"] },
+	{ name: "cua", description: "macOS 图形界面操作", args: ["--", "~/.local/bin/cua-driver", "mcp"], when: "需先安装 cua-driver" },
+];
+const SKILL_RECOMMENDATIONS = [
+	{ id: "anthropic-skills", kind: "package", source: "git:github.com/anthropics/skills", description: "Anthropic 官方技能集（pdf、docx、xlsx 等）" },
+	{ id: "pi-skills", dir: "pi-skills", source: "https://github.com/badlogic/pi-skills", description: "Pi 官方技能集（browser-tools、brave-search 等）" },
+	{ id: "impeccable", dir: "impeccable", command: "npx impeccable install", description: "前端设计审查、打磨与反 slop 工作流（官方安装器支持 Pi）" },
+	{ id: "pstack", dir: "pstack", command: "git clone --depth 1 --filter=blob:none --sparse https://github.com/cursor/plugins /tmp/cursor-plugins && git -C /tmp/cursor-plugins sparse-checkout set pstack && cp -R /tmp/cursor-plugins/pstack ~/.agents/skills/pstack", description: "poteto 的高质量工程工作流与并行 agent 技能集" },
+];
+
+function mcpCommand(item) {
+	return `pi mcp add ${item.name} ${item.args.join(" ")}`;
+}
+
+function skillCommand(item) {
+	if (item.command) return item.command;
+	return item.kind === "package"
+		? `pi install ${item.source}`
+		: `git clone --depth 1 ${item.source} ~/.agents/skills/${item.dir}`;
+}
+
+function configuredMcpServers() {
+	const names = new Set();
+	// Pi merges user-level and project-level servers; either one means configured.
+	for (const path of [join(agentConfigDir(), "mcp.json"), join(cwd(), ".pi", "mcp.json")]) {
+		const current = readJsonObjectFile(path);
+		for (const name of Object.keys(current.value.mcpServers ?? {})) names.add(name);
+	}
+	return names;
+}
+
+function missingRecommendations() {
+	const servers = configuredMcpServers();
+	const sources = new Set();
+	for (const scope of [false, true]) for (const source of readInstalledSources(scope).sources) sources.add(source);
+	const mcp = MCP_RECOMMENDATIONS.filter((item) => !servers.has(item.name));
+	const skills = SKILL_RECOMMENDATIONS.filter((item) => {
+		if (item.dir) return ![join(homedir(), ".agents", "skills", item.dir), join(agentConfigDir(), "skills", item.dir)].some((path) => existsSync(path));
+		return ![...sources].some((source) => source === item.source || source.startsWith(`${item.source}@`));
+	});
+	return { mcp, skills };
+}
+
+function printRecommendations(interactive) {
+	const { mcp, skills } = missingRecommendations();
+	if (mcp.length === 0 && skills.length === 0) return;
+	const lines = [];
+	if (mcp.length) {
+		lines.push("MCP servers:");
+		for (const item of mcp) lines.push(`  ${item.description}${item.when ? ` — ${item.when}` : ""}`, `    ${mcpCommand(item)}`);
+	}
+	if (skills.length) {
+		lines.push("Skills:");
+		for (const item of skills) lines.push(`  ${item.description}`, `    ${skillCommand(item)}`);
+	}
+	const body = lines.join("\n");
+	if (interactive) note(body, "Recommended integrations");
+	else {
+		printHeader("Recommended integrations:");
+		console.log(body);
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Output helpers
 // ---------------------------------------------------------------------------
 const isTTY = Boolean(stdout.isTTY);
@@ -304,6 +375,7 @@ ${bold("Default behaviour:")}
   - With --yes, --force, --only, or --except interactive selection is skipped.
   - --force removes every installed Pi extension (settings backed up first), then reinstalls the selected catalog; file entries are resynced with a backup before overwrite.
   - update does not filter one extension; use pi update <source> for that.
+  - MCP servers and skills are recommended, never written: install and doctor print the exact command for each missing one.
 
 ${bold("Categories:")}
 ${CATEGORIES.map((category) => `  ${category}`).join("\n")}
@@ -886,6 +958,7 @@ async function cmdPresets(flags) {
 	for (const entry of written) console.log(`Applied ${entry.path}${entry.backup ? ` — Backup: ${entry.backup}` : ""}`);
 	console.log(written.length ? `Applied ${written.length} configuration file(s). Restart Pi to load all changes.` : "Configuration unchanged; no backups created.");
 	printSetupCommands(selected, false);
+	printRecommendations(false);
 	return 0;
 }
 
@@ -948,6 +1021,7 @@ async function cmdInstall(flags) {
 		if (!reportPostInstallResults(postInstall, interactive)) return 1;
 		printCheatsheet(selected, interactive);
 		printSetupCommands(selected, interactive);
+		printRecommendations(interactive);
 		const done = "Nothing to do — every selected package is already installed.";
 		if (interactive) log.success(green(done));
 		else console.log(green(done));
@@ -992,6 +1066,7 @@ async function cmdInstall(flags) {
 		if (!postInstallOk) return 1;
 		printCheatsheet(selected, interactive);
 		printSetupCommands(selected, interactive);
+		printRecommendations(interactive);
 		printNextSteps(detectAuth(), installedCount, interactive);
 		return 0;
 	}
@@ -1157,6 +1232,12 @@ function cmdDoctor(flags) {
 	const extensionCount = PACKAGES.filter((pkg) => !isFileInstall(pkg)).length;
 	const fileEntryCount = PACKAGES.length - extensionCount;
 	pass(`${extensionCount} Pi extension(s) and ${fileEntryCount} file-based item(s) configured`);
+
+	printHeader("Recommended integrations");
+	const recommended = missingRecommendations();
+	if (recommended.mcp.length === 0 && recommended.skills.length === 0) pass("All recommended MCP servers and skills are present");
+	for (const item of recommended.mcp) warn(`mcp ${item.name} not configured — ${mcpCommand(item)}`, { fatal: false });
+	for (const item of recommended.skills) warn(`skill ${item.id} not installed — ${skillCommand(item)}`, { fatal: false });
 
 	printHeader("Auth");
 	const auth = detectAuth();

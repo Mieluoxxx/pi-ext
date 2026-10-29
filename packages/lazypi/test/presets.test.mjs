@@ -314,7 +314,7 @@ test("--preset all expands to the full built-in preset set", (t) => {
 	assert.equal(settings.defaultProvider, "cpa-openai-responses");
 	assert.equal(settings.defaultModel, "deepseek-flash");
 	assert.ok(Object.keys(json(join(state.agentDir, "models.json")).providers).length > 0);
-	assert.equal(existsSync(join(state.agentDir, "mcp.json")), true);
+	assert.equal(existsSync(join(state.agentDir, "mcp.json")), false, "presets must not write mcp.json");
 	assert.equal(existsSync(join(state.agentDir, "zentui.json")), true);
 	assert.equal(readFileSync(join(state.agentDir, "AGENTS.md"), "utf8"), readFileSync("agent/AGENTS.md", "utf8"));
 });
@@ -334,13 +334,13 @@ test("models preset ships placeholder keys and replicates provider defaults", (t
 	assert.equal(settings.defaultModel, "deepseek-flash");
 });
 
-test("base preset copies the portable mcp servers", (t) => {
+test("base preset leaves mcp.json to the user", (t) => {
 	const state = workspace(t);
 	success(run(state, ["--preset", "base", "--yes"]));
-	const mcp = json(join(state.agentDir, "mcp.json")).mcpServers;
-	assert.match(mcp.cua.command, /^~\//);
-	assert.match(mcp.cua.env.CUA_DRIVER_POLICY_FILE, /^\$\{HOME\}/);
-	assert.equal(json("presets/base/mcp.json").mcpServers.exa.url, mcp.exa.url);
+	assert.equal(existsSync(join(state.agentDir, "mcp.json")), false);
+	const output = run(state, ["--preset", "base", "--yes"]).stdout;
+	assert.match(output, /Recommended integrations/);
+	assert.match(output, /pi mcp add exa /);
 });
 
 test("replacement packages refuse known legacy conflicts without uninstalling them", (t) => {

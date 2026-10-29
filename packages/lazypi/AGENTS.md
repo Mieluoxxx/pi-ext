@@ -36,6 +36,10 @@ Preset install tests must isolate HOME and `PI_CODING_AGENT_DIR`. The packed smo
 
 Do not read or copy the maintainer's `models.json` to build catalog presets. No built-in CPA/model preset is shipped; generic model-merge tests use synthetic fixtures only.
 
+## Recommended integrations
+
+`MCP_RECOMMENDATIONS` and `SKILL_RECOMMENDATIONS` in `bin/lazypi.mjs` are advisory only: they are never written to settings, `mcp.json`, or the filesystem. `install` prints the exact `pi mcp add` / `pi install` / `git clone` command for every missing recommendation, and `doctor` reports the same list as non-fatal warnings. Presence is detected from `~/.pi/agent/mcp.json`, the project `.pi/mcp.json`, both settings scopes, and `~/.agents/skills/` / `~/.pi/agent/skills/`. Keep recommendations out of `PACKAGES`: they do not participate in selection, `status`, `--force`, or `remove`.
+
 ## Settings boundaries
 
 Global Pi settings are read from `~/.pi/agent/settings.json`, or from `PI_CODING_AGENT_DIR` when set. `--local` uses `.pi/settings.json` in the current working directory.
@@ -48,7 +52,7 @@ Do not replace a user's settings file wholesale. Preserve unrelated package entr
 - `install --force` removes every installed Pi extension (backing up `settings.json` first), then reinstalls the selected catalog packages and resyncs file-based entries with a backup before overwrite.
 - `status` reports installed, missing, and extra Pi extensions.
 - `update` delegates to Pi's overall update command; it does not select one extension.
-- `doctor` checks Node, npm, git, Pi, settings, catalog order, and auth.
+- `doctor` checks Node, npm, git, Pi, settings, catalog order, recommended integrations, and auth.
 - `remove` removes a catalog id or raw Pi source.
 
 Use `pi update <source>` when updating one extension directly.
