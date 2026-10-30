@@ -37,7 +37,7 @@ npx @moguw/lazypi --local                  # install into .pi/settings.json of t
 
 ### Portable package sources
 
-The extension set follows the approved 10-extension `pi list` snapshot, normalizing five local [pi-ext](https://github.com/Mieluoxxx/pi-ext) checkouts to their `@moguw` npm package sources. Four existing file entries (AGENTS, the two Vesper themes and `vision.json`) remain separate from that extension list. npm sources remain unpinned; package-name parity is not a guarantee of byte-for-byte version parity. Publish new package versions before releasing a LazyPi catalog that requires them.
+The extension set follows the approved 9-extension `pi list` snapshot, normalizing four local [pi-ext](https://github.com/Mieluoxxx/pi-ext) checkouts to their `@moguw` npm package sources. Four existing file entries (AGENTS, the two Vesper themes and `vision.json`) remain separate from that extension list. npm sources remain unpinned; package-name parity is not a guarantee of byte-for-byte version parity. Publish new package versions before releasing a LazyPi catalog that requires them.
 
 | Catalog id | Category | Pi install source |
 | --- | --- | --- |
@@ -45,7 +45,6 @@ The extension set follows the approved 10-extension `pi list` snapshot, normaliz
 | `stats-dashboard` | `ui` | `npm:@moguw/pi-stats-dashboard` |
 | `interactive-shell` | `tools` | `npm:@moguw/pi-interactive-shell` |
 | `session-rename` | `sessions` | `npm:@moguw/pi-session-rename` |
-| `session-fork` | `sessions` | `npm:@moguw/pi-session-fork` |
 
 The old `subagents`, TPS, Recap, CodeGraph extension, Simplify, Context7, standalone `apply-patch`, `web-access`, `lazy-tools` and `computer-use` entries are no longer selected by this catalog; `advisor` now refers to `@moguw/pi-advisor`, not `pi-omp-advisor` or `@juicesharp/rpiv-advisor`. CodeGraph remains an independently installed CLI/Skill workflow, not a catalog extension.
 
