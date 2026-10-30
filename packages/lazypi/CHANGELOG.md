@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.0 — 2026-10-30
+
+- Drop `goal`: it is no longer installed. `@narumitw/pi-goal` stays published on npm, and the `workflow` preset no longer requires it or ships its `pi-goal.json` continuation limit. Catalog matches a 7-extension snapshot.
+- Drop `stats-dashboard`: the extension source left the pi-ext workspace, so the catalog no longer curates it. `@moguw/pi-stats-dashboard` stays published on npm and installs with `pi install npm:@moguw/pi-stats-dashboard`; the `ui` preset no longer requires it.
+- File `session-rename` under `sessions` rather than `herdr`. The extension stopped syncing session names to Herdr tabs, so the category named a mechanism it no longer uses; `session-fork`, the other `herdr` entry, was retired in the same pass.
+- Requires `@moguw/pi-session-rename` 0.3.0: automatic naming now runs on `agent_settled` and releases ownership when any other writer renames the session, so `/name`, RPC, other extensions, and the session picker are no longer overwritten.
+
 ## 0.9.0 — 2026-10-29
 
 - Stop writing `mcp.json` from the `base` preset. MCP servers and skills are now advisory: `install` prints the exact `pi mcp add` / `pi install` / `git clone` / `npx` command for each missing recommendation, and `doctor` lists them as non-fatal warnings. Skill recommendations cover the Anthropic and Pi collections plus `impeccable` and `pstack`. Configured state is detected from the user and project `mcp.json`, both settings scopes, and `~/.agents/skills` / `~/.pi/agent/skills`, so local-only servers (`apple-notes`, `fff`) and user edits no longer drift or get overwritten. Edit `MCP_RECOMMENDATIONS` and `SKILL_RECOMMENDATIONS` next to `PACKAGES` to change the list.

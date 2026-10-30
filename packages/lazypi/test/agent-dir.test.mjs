@@ -92,13 +92,13 @@ test("status reads settings from PI_CODING_AGENT_DIR", (t) => {
 	const { home, workspace } = createWorkspace(t);
 	const customAgentDir = join(home, ".pi", "lazy");
 	writeSettings(join(home, ".pi", "agent"), ["npm:@moguw/pi-advisor"]);
-	writeSettings(customAgentDir, ["npm:@narumitw/pi-goal"]);
+	writeSettings(customAgentDir, ["npm:pi-workspace-history"]);
 
 	const result = runCli(["status"], { cwd: workspace, home, agentDir: "~/.pi/lazy" });
 
 	assert.equal(result.status, 0, `STDOUT:\n${result.stdout}\nSTDERR:\n${result.stderr}`);
 	assert.ok(result.stdout.includes(`Settings file: ${join(customAgentDir, "settings.json")}`));
-	assert.match(result.stdout, /✓ \[core\] goal/);
+	assert.match(result.stdout, /✓ \[core\] workspace-history/);
 	assert.doesNotMatch(result.stdout, /✓ \[core\] advisor/);
 });
 
@@ -108,16 +108,16 @@ test("install reads auth and uses the custom global settings", (t) => {
 	const customAgentDir = join(home, ".pi", "lazy");
 	const callsPath = join(root, "pi-calls.log");
 	writeFakePi(bin);
-	writeSettings(defaultAgentDir, ["npm:@narumitw/pi-goal"]);
+	writeSettings(defaultAgentDir, ["npm:pi-workspace-history"]);
 	writeSettings(customAgentDir, ["npm:pi-mcp-adapter"]);
 	writeJson(join(customAgentDir, "auth.json"), { anthropic: { type: "api_key", key: "custom" } });
 
-	const result = runCli(["--yes", "--only", "goal"], { cwd: workspace, home, agentDir: customAgentDir, bin, callsPath });
+	const result = runCli(["--yes", "--only", "workspace-history"], { cwd: workspace, home, agentDir: customAgentDir, bin, callsPath });
 
 	assert.equal(result.status, 0, `STDOUT:\n${result.stdout}\nSTDERR:\n${result.stderr}`);
 	assert.match(result.stdout, /Pi credentials:\s+anthropic \(auth\.json\)/);
-	assert.deepEqual(readFileSync(callsPath, "utf8").trim().split(/\r?\n/), ["install npm:@narumitw/pi-goal"]);
-	assert.deepEqual(JSON.parse(readFileSync(join(defaultAgentDir, "settings.json"), "utf8")).packages, ["npm:@narumitw/pi-goal"]);
+	assert.deepEqual(readFileSync(callsPath, "utf8").trim().split(/\r?\n/), ["install npm:pi-workspace-history"]);
+	assert.deepEqual(JSON.parse(readFileSync(join(defaultAgentDir, "settings.json"), "utf8")).packages, ["npm:pi-workspace-history"]);
 });
 
 test("update and remove inspect the custom global settings", (t) => {
@@ -143,7 +143,7 @@ test("update and remove inspect the custom global settings", (t) => {
 test("--local settings remain independent of PI_CODING_AGENT_DIR", (t) => {
 	const { home, workspace } = createWorkspace(t);
 	const customAgentDir = join(home, ".pi", "lazy");
-	writeSettings(customAgentDir, ["npm:@narumitw/pi-goal"]);
+	writeSettings(customAgentDir, ["npm:pi-workspace-history"]);
 	writeSettings(join(workspace, ".pi"), ["npm:@moguw/pi-advisor"]);
 
 	const result = runCli(["status", "--local"], { cwd: workspace, home, agentDir: customAgentDir });
@@ -151,7 +151,7 @@ test("--local settings remain independent of PI_CODING_AGENT_DIR", (t) => {
 	assert.equal(result.status, 0, `STDOUT:\n${result.stdout}\nSTDERR:\n${result.stderr}`);
 	assert.ok(result.stdout.includes(`Settings file: ${realpathSync(join(workspace, ".pi", "settings.json"))}`));
 	assert.match(result.stdout, /✓ \[core\] advisor/);
-	assert.doesNotMatch(result.stdout, /✓ \[core\] goal/);
+	assert.doesNotMatch(result.stdout, /✓ \[core\] workspace-history/);
 });
 
 test("--force removes installed extensions then reinstalls the catalog", (t) => {

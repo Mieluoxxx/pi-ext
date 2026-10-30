@@ -26,11 +26,9 @@ export const PACKAGES = [
 	// core
 	{ id: "advisor", category: "core", source: "npm:@moguw/pi-advisor", description: "实时会话顾问", hint: "主模型在动笔前、卡住或宣布完成前自主调用零参数 advisor()；稳定缓存前缀、费用预算与超时、按收益保活；同模型直接禁用。模型选择存于 ~/.config/rpiv-advisor/advisor.json，不在 agent 目录内。", conflicts: ["npm:@juicesharp/rpiv-advisor", "npm:pi-omp-advisor"] },
 	{ id: "workspace-history", category: "core", source: "npm:pi-workspace-history", description: "工作区回溯", hint: "回滚的不只是聊天记录——导航历史时同步恢复工作区文件，支持 /undo、/redo 与 /tree。" },
-	{ id: "goal", category: "core", source: "npm:@narumitw/pi-goal", description: "长期目标模式", hint: "用 /goal 设定目标，Pi 跨回合自主推进直至完成，支持暂停、恢复与队列。" },
 	{ id: "vision", category: "core", source: "npm:@getpipher/vision", description: "视觉能力", hint: "按主模型能力自动路由：多模态直读图片，纯文本模型才委托视觉模型分析；vision-config 配置条目定制路由与缓存。" },
 	// ui
 	{ id: "zentui", category: "ui", source: "npm:pi-zentui", description: "终端界面美化", hint: "Opencode 风格编辑框与消息样式，Starship 风格状态栏，四类界面元素独立配置。" },
-	{ id: "stats-dashboard", category: "ui", source: "npm:@moguw/pi-stats-dashboard", description: "本地用量面板", hint: "/stats 扫描持久化会话 JSONL，聚合 lifetime/today/7d/30d 令牌、费用与模型/项目/工具分布。" },
 	// tools
 	{ id: "interactive-shell", category: "tools", source: "npm:@moguw/pi-interactive-shell", description: "交互式 Shell 覆盖层", hint: "在可观察的覆盖层中运行长时间 CLI 与终端工作流。" },
 	{ id: "ponytail", category: "tools", source: "git:github.com/DietrichGebert/ponytail@v4.9.0", description: "极简编码准则", hint: "懒惰资深工程师模式：能不写的代码就不写，优先复用现有实现，保持安全底线。" },
@@ -384,7 +382,7 @@ ${bold("Examples:")}
   ${PACKAGE_COMMAND} --yes                        # everything, no prompt
   ${PACKAGE_COMMAND} --force                      # force reinstall everything
   ${PACKAGE_COMMAND} --only core                  # core extensions
-  ${PACKAGE_COMMAND} --only goal,advisor          # selected extensions
+  ${PACKAGE_COMMAND} --only vision,advisor         # selected extensions
   ${PACKAGE_COMMAND} --only core --local          # project-local install
   ${PACKAGE_COMMAND} status
   ${PACKAGE_COMMAND} doctor`);

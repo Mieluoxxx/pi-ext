@@ -117,9 +117,9 @@ test("installs only preset requirements and rebases over Pi settings updates", (
 	const state = workspace(t);
 	writeJson(join(state.agentDir, "settings.json"), { packages: ["npm:keep"], defaultThinkingLevel: "medium" });
 	const file = preset(state, "custom", [{ to: "agent/settings.json", value: { defaultThinkingLevel: "high" } }], ["vision"]);
-	success(run(state, ["--preset", file, "--only", "goal", "--yes"]));
+	success(run(state, ["--preset", file, "--only", "workspace-history", "--yes"]));
 	const settings = json(join(state.agentDir, "settings.json"));
-	assert.deepEqual(settings.packages, ["npm:keep", source("goal"), source("vision")]);
+	assert.deepEqual(settings.packages, ["npm:keep", source("workspace-history"), source("vision")]);
 	assert.equal(settings.installerNote, "preserve this new field");
 	assert.equal(settings.defaultThinkingLevel, "high");
 	assert.equal(readFileSync(state.calls, "utf8").trim().split("\n").length, 2);

@@ -28,7 +28,7 @@ Select what gets installed:
 
 ```bash
 npx @moguw/lazypi --only core              # only a category
-npx @moguw/lazypi --only goal,advisor     # only specific extension ids
+npx @moguw/lazypi --only vision,advisor    # only specific extension ids
 npx @moguw/lazypi --except tools           # everything but a category
 npx @moguw/lazypi --local                  # install into .pi/settings.json of the current project
 ```
@@ -37,22 +37,20 @@ npx @moguw/lazypi --local                  # install into .pi/settings.json of t
 
 ### Portable package sources
 
-The extension set follows the approved 9-extension `pi list` snapshot, normalizing four local [pi-ext](https://github.com/Mieluoxxx/pi-ext) checkouts to their `@moguw` npm package sources. Four existing file entries (AGENTS, the two Vesper themes and `vision.json`) remain separate from that extension list. npm sources remain unpinned; package-name parity is not a guarantee of byte-for-byte version parity. Publish new package versions before releasing a LazyPi catalog that requires them.
+The extension set follows the approved 7-extension `pi list` snapshot, normalizing three local [pi-ext](https://github.com/Mieluoxxx/pi-ext) checkouts to their `@moguw` npm package sources. Four existing file entries (AGENTS, the two Vesper themes and `vision.json`) remain separate from that extension list. npm sources remain unpinned; package-name parity is not a guarantee of byte-for-byte version parity. Publish new package versions before releasing a LazyPi catalog that requires them.
 
 | Catalog id | Category | Pi install source |
 | --- | --- | --- |
 | `advisor` | `core` | `npm:@moguw/pi-advisor` |
-| `stats-dashboard` | `ui` | `npm:@moguw/pi-stats-dashboard` |
 | `interactive-shell` | `tools` | `npm:@moguw/pi-interactive-shell` |
 | `session-rename` | `sessions` | `npm:@moguw/pi-session-rename` |
 
-The old `subagents`, TPS, Recap, CodeGraph extension, Simplify, Context7, standalone `apply-patch`, `web-access`, `lazy-tools` and `computer-use` entries are no longer selected by this catalog; `advisor` now refers to `@moguw/pi-advisor`, not `pi-omp-advisor` or `@juicesharp/rpiv-advisor`. CodeGraph remains an independently installed CLI/Skill workflow, not a catalog extension.
+The old `subagents`, TPS, Recap, CodeGraph extension, Simplify, Context7, standalone `apply-patch`, `web-access`, `lazy-tools`, `computer-use`, `stats-dashboard` and `session-fork` entries are no longer selected by this catalog; `advisor` now refers to `@moguw/pi-advisor`, not `pi-omp-advisor` or `@juicesharp/rpiv-advisor`. CodeGraph remains an independently installed CLI/Skill workflow, not a catalog extension. `@moguw/pi-stats-dashboard` and `@moguw/pi-session-fork` stay published on npm, so install them directly with `pi install` if you still want them.
 
 Catalog updates do **not** migrate existing local-path registrations or uninstall removed entries. Migrate those registrations explicitly when ready; the catalog change does not alter your running Pi. Installs conservatively check global and current-project registrations for the declared old Advisor sources (including pinned forms) when their replacements are selected; the other scope is only read, never rewritten. This is a guard for known source strings, not a detector for every local checkout, resource filter, trust decision or other project.
 
 ### Newly aligned tools
 
-- **Stats dashboard** aggregates local `/stats` usage: lifetime/today/7d/30d tokens, costs and model/project/tool distributions from persisted session JSONL.
 - **[pi-advisor](https://github.com/Mieluoxxx/pi-ext/tree/main/extensions/pi-advisor)** runs independent advisor consultations with stable cache prefixes, budget metering, timeouts and opt-in completion review; it is derived from `rpiv-mono`'s rpiv-advisor. Its model selection lives in `~/.config/rpiv-advisor/advisor.json`, outside the agent directory — copy that file manually when replicating; `WATCHDOG.yml` belongs to the retired pi-omp-advisor and is not part of this catalog.
 
 Model configuration ships through the optional `models` preset: the provider catalog is sanitized so every `apiKey` is the `$CPA_API_KEY` environment reference, never a literal credential. `auth.json`, project trust and sessions are never copied; on the maintainer's machine `auth.json` is empty and authentication goes through the local proxy key.
@@ -91,8 +89,8 @@ Presets install their catalog requirements and apply configuration files in one 
 | Preset | Configuration |
 | --- | --- |
 | `base` | Global AGENTS.md, `xhigh` default thinking, default tools (`+codemode`, `+tool_search`), transcript-search shortcut |
-| `ui` | Zentui preferences including its native Tool display and Tokens/s, stats dashboard, Vesper theme files; follows the `system` theme |
-| `workflow` | Workspace history, Goal (100 automatic turns), deferred interactive shell, automatic naming |
+| `ui` | Zentui preferences including its native Tool display and Tokens/s, Vesper theme files; follows the `system` theme |
+| `workflow` | Workspace history, deferred interactive shell, automatic naming |
 | `models` | Local CPA proxy provider catalog (`merge-models`), default provider and model; every `apiKey` is a `$CPA_API_KEY` environment reference |
 
 ```bash

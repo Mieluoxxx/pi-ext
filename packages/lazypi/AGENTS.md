@@ -18,7 +18,7 @@ Supported categories are derived automatically from the `category` values in `PA
 Each entry has an `id`, `category`, `description`, and `hint`. Extension entries also declare a `source` (npm or Git Pi install source); file-based entries declare `themeFiles` and/or `agentFiles` instead. Optional `dependencies`, `loadBefore`, and `postInstall` fields express catalog relationships and selected-install configuration; `setupCommands` lists recommended commands printed after install for selected packages. Keep entries ordered by category and use the repository's existing formatting.
 Catalog load-order metadata is applied to existing settings without discarding unrelated packages or fields. A timestamped backup is created before a settings file is rewritten.
 
-The extension set follows the approved 10-extension `pi list` snapshot, with local pi-ext checkouts represented by npm sources. Keep the four file-based entries separately. `conflicts` lists known incompatible legacy sources (including pinned forms); install rejects conflicts instead of silently uninstalling user packages.
+The extension set follows the approved 7-extension `pi list` snapshot, with local pi-ext checkouts represented by npm sources. Keep the four file-based entries separately. `conflicts` lists known incompatible legacy sources (including pinned forms); install rejects conflicts instead of silently uninstalling user packages.
 
 Selected-package `postInstall` JSON merges run only when their required package ids are selected in the same LazyPi install invocation. They preserve unrelated configuration and create a timestamped backup before changing an existing file.
 

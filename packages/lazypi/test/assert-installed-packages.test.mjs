@@ -11,17 +11,17 @@ test("expectedPackageSources matches the full catalog", () => {
 
 test("pi-ext catalog entries use the published moguw sources", () => {
 	const expected = expectedPackageSources();
-	for (const id of ["interactive-shell", "session-rename", "stats-dashboard", "advisor"]) {
+	for (const id of ["interactive-shell", "session-rename", "advisor"]) {
 		const source = `npm:@moguw/pi-${id}`;
 		assert.equal(PACKAGES.find((pkg) => pkg.id === id)?.source, source);
 		assert.ok(expected.includes(source));
 	}
 });
 
-test("catalog matches the normalized nine-extension pi list snapshot", () => {
+test("catalog matches the normalized seven-extension pi list snapshot", () => {
 	const expected = [
-		"npm:pi-workspace-history", "npm:@narumitw/pi-goal", "npm:@getpipher/vision", "npm:pi-zentui",
-		"npm:@moguw/pi-interactive-shell", "npm:@moguw/pi-stats-dashboard",
+		"npm:pi-workspace-history", "npm:@getpipher/vision", "npm:pi-zentui",
+		"npm:@moguw/pi-interactive-shell",
 		"git:github.com/DietrichGebert/ponytail@v4.9.0",
 		"npm:@moguw/pi-session-rename",
 		"npm:@moguw/pi-advisor",
