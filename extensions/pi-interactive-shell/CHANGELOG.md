@@ -2,7 +2,7 @@
 
 All notable changes to the `pi-interactive-shell` extension will be documented in this file.
 
-## [Unreleased]
+## [0.16.3] - 2026-10-30
 
 ### Fixed
 - Route overlay update, transfer, and dispatch-completion messages through the currently bound ExtensionAPI, and bind only at `session_start`. Sessions that outlive `/reload` no longer deliver callbacks into the reloaded factory's stale API, which previously failed the extension load or crashed Pi (`3572073`, `dacfd39`).
