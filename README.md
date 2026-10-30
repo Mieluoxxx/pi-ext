@@ -11,7 +11,7 @@
 
 | 名称 | 设计意图 | 源仓库地址 @ commit |
 | --- | --- | --- |
-| `pi-session-rename` | 为未命名会话自动生成上下文名称；Herdr tab 同步 | - |
+| `pi-session-rename` | 为未命名会话自动生成上下文名称，`/rename` 手动管理 | - |
 | `pi-session-fork` | `/btw` inline 进入上下文、`/btw` outline 用只读快照直调模型不打扰会话；`/btw` 能够 fork 会话并实现 Herdr 分屏 | - |
 | `pi-interactive-shell` | 改进原本的命令，提升 Agent 工具调用正确率 | [nicobailon/pi-interactive-shell](https://github.com/nicobailon/pi-interactive-shell) @ `77df9a8`（v0.17.0，同步水位线见扩展 README 的 Upstream sync） |
 | `pi-advisor` | 独立 advisor 咨询：稳定缓存前缀、费用计量、预算和锚点裁剪、按收益保活；同模型直接禁用 | 派生自 [juicesharp/rpiv-mono](https://github.com/juicesharp/rpiv-mono) 的 rpiv-advisor 2.11.0；[包文档](extensions/pi-advisor/README.md) |
