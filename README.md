@@ -15,7 +15,6 @@
 | `pi-session-fork` | `/btw` inline 进入上下文、`/btw` outline 用只读快照直调模型不打扰会话；`/btw` 能够 fork 会话并实现 Herdr 分屏 | - |
 | `pi-interactive-shell` | 改进原本的命令，提升 Agent 工具调用正确率 | [nicobailon/pi-interactive-shell](https://github.com/nicobailon/pi-interactive-shell) @ `77df9a8`（v0.17.0，同步水位线见扩展 README 的 Upstream sync） |
 | `pi-advisor` | 独立 advisor 咨询：稳定缓存前缀、费用计量、预算和锚点裁剪、按收益保活；同模型直接禁用 | 派生自 [juicesharp/rpiv-mono](https://github.com/juicesharp/rpiv-mono) 的 rpiv-advisor 2.11.0；[包文档](extensions/pi-advisor/README.md) |
-| `pi-stats-dashboard` | 本地 `/stats` 用量面板：扫描持久化会话 JSONL，聚合 lifetime/today/7d/30d 令牌、费用及模型/项目/工具分布，并统计用户消息行为信号 | [suryavamsi6/pi-stats-dashboard](https://github.com/suryavamsi6/pi-stats-dashboard) @ `3ee97be`（v0.1.3 + HEAD 未发布的 token 分类展示改动） |
 | `@moguw/lazypi` | 扩展管理 CLI（非扩展包，位于 `packages/lazypi`）：按 `PACKAGES` 目录安装、审计、更新、移除扩展，并用可组合预设写入 agent 配置 | 本仓库 `packages/lazypi`，源自作者 fork 的 [Mieluoxxx/LazyPi](https://github.com/Mieluoxxx/LazyPi) |
 
 ## 🧑‍💻 本地开发
@@ -33,7 +32,6 @@ pnpm run check
 pi -e ./extensions/pi-advisor
 pi -e ./extensions/pi-session-rename
 pi -e ./extensions/pi-interactive-shell
-pi -e ./extensions/pi-stats-dashboard
 ```
 
 `lazypi` 是 workspace 里的管理 CLI，发布为 `@moguw/lazypi`，不在 `pi -e` 试用范围内：
