@@ -15,7 +15,6 @@ after the first turn and the name is refreshed periodically as the conversation 
 - `/rename` generates a name from the conversation with the configured naming model.
 - `/rename "<name>"` sets a session name directly, overriding any automatic naming.
 - Automatic naming never overwrites a manually set name.
-- Syncs the session name to the current Herdr tab when running inside Herdr.
 - Naming model and thinking level are configurable per user (`~/.pi/agent/rename.json`).
 
 ## 📦 Install
@@ -83,20 +82,21 @@ The previous `~/.pi/agent/pi-session.json` path is not read or migrated.
 - Naming uses the configured model, or the current session model when `model` is empty, through `pi-ai`.
 - Auto-rename fires on the `afterSteps`-th user-agent turn (default: the first), then again every
   `everySteps` turns (default: 5) so the title tracks how the conversation evolves.
+- Naming runs on `agent_settled`, once per user turn, so retries, aborts, and queued
+  continuations never trigger a second request.
 - Titles follow `MMDD｜TYPE｜Topic`: the session start date in Asia/Shanghai, a type code — one of
   `FEA` (feature), `DES` (design), `FIX` (bug fix), `OPT` (optimization), `REL` (release), `EXP`
-  (exploration), `DOC` (docs), `RES` (research) — and a short topic in the user's language.
+  (exploration), `DOC` (docs), `RES` (research) — and a short topic in the user's language. A
+  forked session counts from its own start, not the source session's.
 - Naming instructions and the tagged output contract are built in and are not user-configurable.
 - The request reuses the session transport, websocket connect timeout, session id, and configured naming thinking level.
 - Naming requests have a 60-second timeout and do not set an output-token limit.
 - The model must return `<session_name>...</session_name>` with fewer than 30 words; names are
   truncated to 120 characters.
 - Only text response blocks are parsed; thinking blocks are ignored.
-- Automatic naming never overwrites a manually set name (`/rename "<name>"`); it only refreshes
-  names it generated itself.
-- Manual renames (`/rename` and `/rename "<name>"`) rename the current Herdr tab unconditionally.
-- Automatic renames and session startup/resume only rename Herdr tabs that still have their default label (empty or the tab number), never a custom Herdr label.
-- Herdr sync is best-effort: when Herdr is unavailable or a command fails, session renaming still succeeds.
+- Automatic naming never overwrites a name it does not own, so `/name`, RPC `set_session_name`,
+  an extension's `pi.setSessionName()`, and the session picker's rename all stay authoritative.
+  Only names this extension generated are refreshed.
 
 ## 🔧 Development
 
@@ -122,7 +122,6 @@ name was rejected.
 src/index.ts     Pi package entrypoint
 src/rename.ts    Rename command and automatic naming lifecycle
 src/config.ts    Configuration loading and persistence
-src/herdr.ts     Best-effort Herdr tab sync
 src/settings.ts  Interactive settings UI
 src/debug.ts     Opt-in response diagnostics
 test/            Deterministic unit tests

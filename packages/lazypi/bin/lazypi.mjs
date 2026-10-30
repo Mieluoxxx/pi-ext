@@ -34,9 +34,9 @@ export const PACKAGES = [
 	// tools
 	{ id: "interactive-shell", category: "tools", source: "npm:@moguw/pi-interactive-shell", description: "交互式 Shell 覆盖层", hint: "在可观察的覆盖层中运行长时间 CLI 与终端工作流。" },
 	{ id: "ponytail", category: "tools", source: "git:github.com/DietrichGebert/ponytail@v4.9.0", description: "极简编码准则", hint: "懒惰资深工程师模式：能不写的代码就不写，优先复用现有实现，保持安全底线。" },
-	// herdr
-	{ id: "session-rename", category: "herdr", source: "npm:@moguw/pi-session-rename", description: "会话自动命名", hint: "根据对话上下文自动给会话起名，/rename 随时手动管理。" },
-	{ id: "session-fork", category: "herdr", source: "npm:@moguw/pi-session-fork", description: "会话分叉", hint: "把当前会话分叉到 Herdr 窗格或标签页，/btw 内联或旁路追问。" },
+	// sessions
+	{ id: "session-rename", category: "sessions", source: "npm:@moguw/pi-session-rename", description: "会话自动命名", hint: "根据对话上下文自动给会话起名，/rename 随时手动管理。" },
+	{ id: "session-fork", category: "sessions", source: "npm:@moguw/pi-session-fork", description: "会话分叉", hint: "把当前会话分叉到 Herdr 窗格或标签页，/btw 内联或旁路追问。" },
 	// themes
 	{ id: "vesper-dark", category: "themes", themeFiles: ["themes/vesper-dark.json"], description: "Vesper 暗色主题", hint: "暖桃与薄荷色调的近黑暗色主题；将 settings.theme 设为 \"vesper-dark\" 启用。" },
 	{ id: "vesper-light", category: "themes", themeFiles: ["themes/vesper-light.json"], description: "Vesper 亮色主题", hint: "暖米色底的亮色变体，桃色强调、薄荷点缀；将 settings.theme 设为 \"vesper-light\" 启用。" },

@@ -24,6 +24,7 @@ import {
 	stripQuotes,
 } from "../src/rename.js";
 import { MODEL_SELECTOR_MAX_VISIBLE, showSettings } from "../src/settings.js";
+import registerRenameExtension from "../src/rename.js";
 
 describe("buildConversationText", () => {
 	it("keeps user messages and drops assistant and tool-call content", () => {
@@ -45,6 +46,34 @@ describe("buildConversationText", () => {
 		] as any;
 		expect(buildConversationText(branch)).toBe("User: Fix the auth bug");
 	});
+
+	it("never starts the truncated tail on half a surrogate pair", () => {
+		// Independent of the truncation limit, a code-point boundary is where the cut
+		// may land. Each case below puts a surrogate pair across it.
+		for (const filler of [59_995, 59_999, 60_001]) {
+			const branch = [
+				{
+					type: "message",
+					message: { role: "user", content: "a".repeat(5) + "🎉" + "b".repeat(filler) },
+				},
+			] as any;
+			const text = buildConversationText(branch);
+			const tail = text.startsWith("[Earlier conversation omitted]")
+				? (text.split("\n")[1] ?? "")
+				: text;
+			expect(/^[\uDC00-\uDFFF]/.test(tail)).toBe(false);
+			expect(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(tail)).toBe(false);
+		}
+	});
+
+	it("leaves a conversation at the limit untouched", () => {
+		const branch = [
+			{ type: "message", message: { role: "user", content: "x".repeat(59_980) } },
+		] as any;
+		expect(buildConversationText(branch).startsWith("[Earlier conversation omitted]")).toBe(
+			false,
+		);
+	});
 });
 
 describe("sessionDateStamp", () => {
@@ -52,6 +81,12 @@ describe("sessionDateStamp", () => {
 		const branch = [{ type: "message", timestamp: "2026-09-03T18:00:00Z" }] as any;
 		// 18:00 UTC is already the next day in Shanghai.
 		expect(sessionDateStamp(branch)).toBe("0904");
+	});
+
+	it("prefers the session header timestamp over an inherited first entry", () => {
+		// A fork copies the source entries, so its branch starts months earlier.
+		const branch = [{ type: "message", timestamp: "2026-01-02T04:00:00Z" }] as any;
+		expect(sessionDateStamp(branch, "2026-09-03T04:00:00Z")).toBe("0903");
 	});
 
 	it("falls back to now for an empty branch", () => {
@@ -304,8 +339,9 @@ describe("naming response diagnostics", () => {
 	});
 
 	it("distinguishes missing and empty session-name tags", () => {
-		expect(getEmptyNameReason("Billing schema migration", 1)).toBe(
-			"missing-session-name-tag",
+		expect(getEmptyNameReason("Session name here", 1)).toBe("missing-session-name-tag");
+		expect(getEmptyNameReason("<session_name></session_name>", 1)).toBe(
+			"empty-session-name-tag",
 		);
 		expect(getEmptyNameReason("<session_name> \n </session_name>", 1)).toBe(
 			"empty-session-name-tag",
@@ -408,19 +444,28 @@ describe("isNamingDue", () => {
 
 describe("shouldApplyAutoName", () => {
 	it("applies when the session epoch is unchanged and the name is still unset", () => {
-		expect(shouldApplyAutoName(1, 1, undefined, false)).toBe(true);
+		expect(shouldApplyAutoName(1, 1, undefined, undefined)).toBe(true);
 	});
 
 	it("skips when the session was replaced during generation", () => {
-		expect(shouldApplyAutoName(1, 2, undefined, false)).toBe(false);
+		expect(shouldApplyAutoName(1, 2, undefined, undefined)).toBe(false);
 	});
 
 	it("skips when a name was set while generation was pending", () => {
-		expect(shouldApplyAutoName(1, 1, "Manually set", false)).toBe(false);
+		expect(shouldApplyAutoName(1, 1, "Manually set", undefined)).toBe(false);
 	});
 
-	it("replaces a previous auto-generated name on refresh", () => {
-		expect(shouldApplyAutoName(1, 1, "0901｜EXP｜Old title", true)).toBe(true);
+	it("skips a manual name even after auto-naming owned the session earlier", () => {
+		// The regression this guards: /name set a new name, so lastAutoName no longer matches.
+		expect(shouldApplyAutoName(1, 1, "My manual name", "0901｜EXP｜Old title")).toBe(
+			false,
+		);
+	});
+
+	it("replaces its own previous name on refresh", () => {
+		expect(shouldApplyAutoName(1, 1, "0901｜EXP｜Old title", "0901｜EXP｜Old title")).toBe(
+			true,
+		);
 	});
 });
 
@@ -538,5 +583,107 @@ describe("config", () => {
 		const { value } = loadConfig(path);
 		expect(value.afterSteps).toBe(1);
 		expect(value.model).toBe("openai/gpt-4o-mini");
+	});
+});
+
+describe("auto-rename lifecycle", () => {
+	type Handler = (event: any, ctx: any) => unknown;
+
+	function createHarness(initialName?: string) {
+		const handlers = new Map<string, Handler[]>();
+		let sessionName = initialName;
+		const pi = {
+			on(event: string, handler: Handler) {
+				const list = handlers.get(event) ?? [];
+				list.push(handler);
+				handlers.set(event, list);
+				return () => undefined;
+			},
+			registerCommand() {},
+			getSessionName: () => sessionName,
+			setSessionName: (name: string) => {
+				sessionName = name;
+			},
+		};
+		registerRenameExtension(pi as any);
+		return {
+			has: (event: string) => handlers.has(event),
+			setNameExternally: (name: string) => {
+				sessionName = name;
+			},
+			async emit(event: string, ctx: any, payload: any = {}) {
+				for (const handler of handlers.get(event) ?? []) {
+					await handler({ type: event, ...payload }, ctx);
+				}
+			},
+			get name() {
+				return sessionName;
+			},
+		};
+	}
+
+	function spyCtx() {
+		const messages: string[] = [];
+		let branchReads = 0;
+		return {
+			messages,
+			branchReads: () => branchReads,
+			ctx: {
+				ui: {
+					notify: (message: string) => messages.push(message),
+					setStatus: () => undefined,
+				},
+				sessionManager: {
+					getBranch: () => {
+						branchReads += 1;
+						return [];
+					},
+					getHeader: () => null,
+					getSessionId: () => "session-1",
+				},
+				isProjectTrusted: () => false,
+				model: undefined,
+				modelRegistry: { find: () => undefined, hasConfiguredAuth: () => false },
+			},
+		};
+	}
+
+	it("hooks agent_settled, not agent_end", () => {
+		const harness = createHarness();
+		expect(harness.has("agent_settled")).toBe(true);
+		// agent_end also fires for runs that will retry or continue.
+		expect(harness.has("agent_end")).toBe(false);
+	});
+
+	it("never overwrites a name it does not own", async () => {
+		const { messages, branchReads, ctx } = spyCtx();
+		const harness = createHarness("My manual name");
+		await harness.emit("agent_settled", ctx);
+		expect(messages).toEqual([]);
+		// Returned at the ownership guard, before touching the branch.
+		expect(branchReads()).toBe(0);
+		expect(harness.name).toBe("My manual name");
+	});
+
+	it("releases ownership when another writer renames the session", async () => {
+		const { messages, branchReads, ctx } = spyCtx();
+		const harness = createHarness();
+		// Another writer sets the name and Pi reports it back.
+		harness.setNameExternally("Set by /name");
+		await harness.emit("session_info_changed", ctx, { name: "Set by /name" });
+		await harness.emit("agent_settled", ctx);
+		expect(messages).toEqual([]);
+		expect(branchReads()).toBe(0);
+		expect(harness.name).toBe("Set by /name");
+	});
+
+	it("counts turns for an unnamed session instead of stopping at the guard", async () => {
+		const { messages, branchReads, ctx } = spyCtx();
+		const harness = createHarness();
+		await harness.emit("agent_settled", ctx);
+		// An empty branch means zero turns, so naming is not due yet.
+		expect(branchReads()).toBe(1);
+		expect(messages).toEqual([]);
+		expect(harness.name).toBeUndefined();
 	});
 });

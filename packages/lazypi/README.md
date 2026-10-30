@@ -44,8 +44,8 @@ The extension set follows the approved 10-extension `pi list` snapshot, normaliz
 | `advisor` | `core` | `npm:@moguw/pi-advisor` |
 | `stats-dashboard` | `ui` | `npm:@moguw/pi-stats-dashboard` |
 | `interactive-shell` | `tools` | `npm:@moguw/pi-interactive-shell` |
-| `session-rename` | `herdr` | `npm:@moguw/pi-session-rename` |
-| `session-fork` | `herdr` | `npm:@moguw/pi-session-fork` |
+| `session-rename` | `sessions` | `npm:@moguw/pi-session-rename` |
+| `session-fork` | `sessions` | `npm:@moguw/pi-session-fork` |
 
 The old `subagents`, TPS, Recap, CodeGraph extension, Simplify, Context7, standalone `apply-patch`, `web-access`, `lazy-tools` and `computer-use` entries are no longer selected by this catalog; `advisor` now refers to `@moguw/pi-advisor`, not `pi-omp-advisor` or `@juicesharp/rpiv-advisor`. CodeGraph remains an independently installed CLI/Skill workflow, not a catalog extension.
 
@@ -53,7 +53,7 @@ Catalog updates do **not** migrate existing local-path registrations or uninstal
 
 ### Newly aligned tools
 
-- **[Stats dashboard](https://github.com/Mieluoxxx/pi-ext/tree/main/extensions/pi-stats-dashboard)** aggregates local `/stats` usage: lifetime/today/7d/30d tokens, costs and model/project/tool distributions from persisted session JSONL.
+- **Stats dashboard** aggregates local `/stats` usage: lifetime/today/7d/30d tokens, costs and model/project/tool distributions from persisted session JSONL.
 - **[pi-advisor](https://github.com/Mieluoxxx/pi-ext/tree/main/extensions/pi-advisor)** runs independent advisor consultations with stable cache prefixes, budget metering, timeouts and opt-in completion review; it is derived from `rpiv-mono`'s rpiv-advisor. Its model selection lives in `~/.config/rpiv-advisor/advisor.json`, outside the agent directory — copy that file manually when replicating; `WATCHDOG.yml` belongs to the retired pi-omp-advisor and is not part of this catalog.
 
 Model configuration ships through the optional `models` preset: the provider catalog is sanitized so every `apiKey` is the `$CPA_API_KEY` environment reference, never a literal credential. `auth.json`, project trust and sessions are never copied; on the maintainer's machine `auth.json` is empty and authentication goes through the local proxy key.

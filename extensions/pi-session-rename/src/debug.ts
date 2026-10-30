@@ -136,7 +136,9 @@ export function getEmptyNameReason(
 ): EmptyNameReason {
 	if (textBlockCount === 0) return "no-text-block";
 	if (!text.trim()) return "text-whitespace-only";
-	const match = /<session_name>([\s\S]*?)<\/session_name>/i.exec(text);
-	if (!match) return "missing-session-name-tag";
-	return match[1]?.trim() ? "missing-session-name-tag" : "empty-session-name-tag";
+	// A non-blank tag always parses, so reaching here means the tag is missing or blank.
+	if (!/<session_name>([\s\S]*?)<\/session_name>/i.test(text)) {
+		return "missing-session-name-tag";
+	}
+	return "empty-session-name-tag";
 }
