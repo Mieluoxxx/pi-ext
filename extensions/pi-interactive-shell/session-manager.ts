@@ -1,4 +1,5 @@
 import { PtyTerminalSession } from "./pty-session.ts";
+import { forgetDrainPosition } from "./session-query.ts";
 
 export interface BackgroundSession {
 	id: string;
@@ -338,6 +339,8 @@ export class ShellSessionManager {
 			session.session.dispose();
 			this.sessions.delete(id);
 			releaseSessionId(id);
+			// The id may be reused later; its old cursor must not leak into the next one.
+			forgetDrainPosition(id);
 			this.notifyChange();
 		}
 	}

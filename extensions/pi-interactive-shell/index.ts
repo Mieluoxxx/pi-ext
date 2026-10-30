@@ -1,7 +1,6 @@
 import type { ExtensionAPI, ExtensionContext, ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 import { isKeyRelease, isKeyRepeat, matchesKey } from "@earendil-works/pi-tui";
 import { InteractiveShellOverlay } from "./overlay-component.ts";
-import { ReattachOverlay } from "./reattach-overlay.ts";
 import { PtyTerminalSession } from "./pty-session.ts";
 import { formatDuration, formatDurationMs } from "./types.ts";
 import type {
@@ -42,7 +41,7 @@ import type {
 import { setupBackgroundWidget } from "./background-widget.ts";
 import { buildDispatchNotification, buildHandsFreeUpdateMessage, buildMonitorEventNotification, buildMonitorLifecycleNotification, buildResultNotification, buildSettlementNotice, summarizeInteractiveResult } from "./notification-utils.ts";
 import { watchPiSettlement } from "./pi-settlement-watcher.ts";
-import { createSessionQueryState, getSessionOutput, type SessionQueryState } from "./session-query.ts";
+import { createSessionQueryState, forgetDrainPosition, getSessionOutput, seedDrainPosition, type SessionQueryState } from "./session-query.ts";
 import { InteractiveShellCoordinator } from "./runtime-coordinator.ts";
 import { spawn as spawnChildProcess } from "node:child_process";
 import { resolvePiShell, type ResolvedShellConfig } from "./shell-resolution.ts";
@@ -127,13 +126,6 @@ function makeMonitorCompletionCallback(
 	};
 }
 
-/**
- * Announce each finished turn of a spawned pi child to the parent.
- *
- * The child stays alive after answering, so this notice is what tells the
- * parent its task is done and follow-up work is possible. Teardown is a
- * separate concern handled by the quiet/settlement path.
- */
 /**
  * Whether a spawned child outlives its turn. Quiet auto-close is on by default
  * for dispatch and off for hands-free, so the mode alone is not the answer.
@@ -675,7 +667,7 @@ const backgroundQueryStates = new WeakMap<BackgroundSession, SessionQueryState>(
 function backgroundSessionTarget(entry: BackgroundSession, config: InteractiveShellConfig): ActiveSession {
 	let queryState = backgroundQueryStates.get(entry);
 	if (!queryState) {
-		queryState = createSessionQueryState();
+		queryState = seedDrainPosition(createSessionQueryState(), entry.id);
 		backgroundQueryStates.set(entry, queryState);
 	}
 	const id = entry.id;
@@ -686,7 +678,7 @@ function backgroundSessionTarget(entry: BackgroundSession, config: InteractiveSh
 		write: (data) => entry.session.write(data),
 		kill: () => entry.session.kill(),
 		background: () => {},
-		getOutput: (options) => getSessionOutput(entry.session, config, queryState, options),
+		getOutput: (options) => getSessionOutput(entry.session, config, queryState, options, undefined, entry.id),
 		getStatus: () => (entry.session.exited ? "exited" : "running"),
 		getRuntime: () => Date.now() - entry.startedAt.getTime(),
 		getResult: () => (entry.session.exited
@@ -2098,14 +2090,19 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 			try {
 				const result = await ctx.ui.custom<InteractiveShellResult>(
 					(tui, theme, _kb, done) =>
-						new ReattachOverlay(
-							tui,
-							theme,
-							{ id: session.id, command: session.command, reason: session.reason, session: session.session },
-							config,
-							done,
-							() => coordinator.unfocusOverlay(),
-						),
+						new InteractiveShellOverlay(tui, theme, {
+							command: session.command,
+							existingSession: session.session,
+							sessionId: session.id,
+							name: session.id,
+							reason: session.reason,
+							startedAt: session.startedAt.getTime(),
+							piSessionDir: session.piSessionDir,
+							// The entry stays in the background table while attached, so a host
+							// teardown must detach rather than kill the process it owns.
+							detachOnDispose: true,
+							onUnfocus: () => coordinator.unfocusOverlay(),
+						}, config, done),
 					createOverlayUiOptions(config),
 				);
 
@@ -2119,10 +2116,14 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 						monitor.handleExternalCompletion(result.exitCode, result.signal, result.completionOutput, result.settlement);
 						coordinator.deleteMonitor(targetId);
 					}
-				} else if (result.backgrounded) {
+				}
+				if (result.backgrounded) {
+					// Detached back into the table; keep its lifecycle running.
 					sessionManager.restartAutoCleanup(targetId);
 				} else {
-					sessionManager.scheduleCleanup(targetId);
+					// The overlay ended the session (exit, kill, or transfer): drop the entry now
+					// instead of leaving a dead row in `action: "list"` for the cleanup delay.
+					sessionManager.remove(targetId);
 				}
 			} catch (error) {
 				restoreBackgroundLifecycle();

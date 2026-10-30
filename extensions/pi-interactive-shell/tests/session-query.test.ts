@@ -45,7 +45,10 @@ function makeSession() {
 			totalLinesInBuffer: 3,
 			truncatedByChars: Boolean(maxChars && maxChars < 5),
 		}),
-		getRawStream: ({ sinceLast }: { sinceLast?: boolean }) => sinceLast ? "delta\nepsilon" : "alpha\nbeta\ngamma",
+		readStreamFrom: ({ from = 0 }: { from?: number }) => {
+			const raw = "alpha\nbeta\ngammadelta\nepsilon";
+			return { output: raw.substring(from), nextOffset: raw.length };
+		},
 		getLogSlice: ({ offset = 0, limit = 50 }: { offset?: number; limit?: number }) => {
 			const lines = ["zero", "one", "two", "three"];
 			const selected = lines.slice(offset, offset + limit);
@@ -109,7 +112,7 @@ describe("getSessionOutput", () => {
 				captured = options;
 				return { lines: ["alpha"], totalLinesInBuffer: 1, truncatedByChars: false };
 			},
-			getRawStream: () => "",
+			readStreamFrom: () => ({ output: "", nextOffset: 0 }),
 			getLogSlice: () => ({ slice: "", totalLines: 0, totalChars: 0, sliceLineCount: 0 }),
 		} as any;
 
@@ -129,5 +132,62 @@ describe("getSessionOutput", () => {
 		const second = getSessionOutput(session, config, state);
 		expect(second.rateLimited).toBe(true);
 		expect(second.waitSeconds).toBeGreaterThan(0);
+	});
+});
+
+describe("drain and hands-free updates own separate cursors", () => {
+	// The bug this locks down: `getRawStream({ sinceLast: true })` advanced one
+	// field on the terminal, so whichever reader ran first consumed the bytes the
+	// other still needed, and the loss was silent.
+	function makeCursorSession() {
+		let raw = "";
+		return {
+			append(text: string) { raw += text; },
+			readStreamFrom({ from = 0 }: { from?: number } = {}) {
+				const offset = Math.max(0, Math.min(from, raw.length));
+				return { output: raw.substring(offset), nextOffset: raw.length };
+			},
+			getTailLines: () => ({ lines: [], totalLinesInBuffer: 0, truncatedByChars: false }),
+			getLogSlice: () => ({ slice: "", totalLines: 0, totalChars: 0, sliceLineCount: 0 }),
+		} as any;
+	}
+
+	it("gives drain its own cursor, so a later reader still sees new bytes", () => {
+		const session = makeCursorSession();
+		const queryState = createSessionQueryState();
+		const handsFreeCursor = { offset: 0 };
+
+		session.append("first batch\n");
+		const drained = getSessionOutput(session, config, queryState, { drain: true, skipRateLimit: true }).output;
+		expect(drained).toContain("first batch");
+
+		session.append("second batch\n");
+		const update = session.readStreamFrom({ from: handsFreeCursor.offset });
+		handsFreeCursor.offset = update.nextOffset;
+		// The old shared cursor returned "" here; the bytes are what the bug ate.
+		expect(update.output).toContain("second batch");
+
+		// And drain resumes where it left off, not at the hands-free position.
+		const drainedAgain = getSessionOutput(session, config, queryState, { drain: true, skipRateLimit: true }).output;
+		expect(drainedAgain).toContain("second batch");
+	});
+
+	it("keeps the hands-free cursor independent of a drain in between", () => {
+		const session = makeCursorSession();
+		const queryState = createSessionQueryState();
+		let handsFreeOffset = 0;
+
+		session.append("alpha\n");
+		const first = session.readStreamFrom({ from: handsFreeOffset });
+		handsFreeOffset = first.nextOffset;
+		expect(first.output).toContain("alpha");
+
+		session.append("beta\n");
+		getSessionOutput(session, config, queryState, { drain: true, skipRateLimit: true });
+
+		const next = session.readStreamFrom({ from: handsFreeOffset });
+		handsFreeOffset = next.nextOffset;
+		expect(next.output).toContain("beta");
+		expect(next.output).not.toContain("alpha");
 	});
 });

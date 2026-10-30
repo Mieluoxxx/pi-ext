@@ -7,6 +7,33 @@ import type { PtyTerminalSession } from "./pty-session.ts";
 export interface SessionQueryState {
 	lastQueryTime: number;
 	incrementalReadPosition: number;
+	/** Byte offset into the PTY's raw buffer, owned by the `drain` reader alone. */
+	drainReadPosition: number;
+}
+
+/**
+ * Drain cursors keyed by session id.
+ *
+ * A session changes owner as it moves between the background table and an
+ * overlay, and each owner used to start a fresh cursor at 0 — so the first
+ * `drain` after attaching replayed the whole buffer. The cursor belongs to the
+ * session, not to whoever is looking at it right now.
+ */
+const drainCursors = new Map<string, number>();
+
+/** Carry a session's drain position into a newly created query state. */
+export function seedDrainPosition(state: SessionQueryState, sessionId: string): SessionQueryState {
+	state.drainReadPosition = drainCursors.get(sessionId) ?? 0;
+	return state;
+}
+
+/** Record where the drain reader stopped, so the next owner resumes there. */
+export function rememberDrainPosition(sessionId: string, position: number): void {
+	drainCursors.set(sessionId, position);
+}
+
+export function forgetDrainPosition(sessionId: string): void {
+	drainCursors.delete(sessionId);
 }
 
 export const DEFAULT_STATUS_OUTPUT = 5 * 1024;
@@ -18,6 +45,7 @@ export function createSessionQueryState(): SessionQueryState {
 	return {
 		lastQueryTime: 0,
 		incrementalReadPosition: 0,
+		drainReadPosition: 0,
 	};
 }
 
@@ -27,6 +55,8 @@ export function getSessionOutput(
 	state: SessionQueryState,
 	options: OutputOptions | boolean = false,
 	completionOutput?: InteractiveShellResult["completionOutput"],
+	/** Session whose drain cursor this read advances; omitted for a private state. */
+	sessionId?: string,
 ): OutputResult {
 	if (completionOutput) {
 		return buildCompletionOutputResult(completionOutput);
@@ -43,7 +73,11 @@ export function getSessionOutput(
 	}
 
 	if (opts.drain) {
-		return buildTruncatedOutput(session.getRawStream({ sinceLast: true, stripAnsi: true }), requestedMaxChars, true);
+		// The cursor is ours; the terminal no longer advances one for the whole session.
+		const { output, nextOffset } = session.readStreamFrom({ from: state.drainReadPosition, stripAnsi: true });
+		state.drainReadPosition = nextOffset;
+		if (sessionId) rememberDrainPosition(sessionId, nextOffset);
+		return buildTruncatedOutput(output, requestedMaxChars, true);
 	}
 
 	if (opts.offset !== undefined) {

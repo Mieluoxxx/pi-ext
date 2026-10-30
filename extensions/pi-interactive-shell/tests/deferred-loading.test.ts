@@ -55,7 +55,6 @@ async function setupHarness(defer: boolean, dynamicApis = true, allowedTools = [
 		loadConfig: () => ({ ...baseConfig, defer }),
 	}));
 	vi.doMock("../overlay-component.ts", () => ({ InteractiveShellOverlay: class {} }));
-	vi.doMock("../reattach-overlay.ts", () => ({ ReattachOverlay: class {} }));
 	vi.doMock("../pty-session.ts", () => ({ PtyTerminalSession: class {} }));
 	vi.doMock("../headless-monitor.ts", () => ({ HeadlessDispatchMonitor: class {} }));
 	vi.doMock("../background-widget.ts", () => ({ setupBackgroundWidget: () => () => {} }));
@@ -110,7 +109,6 @@ describe("deferred interactive_shell loading", () => {
 		vi.doUnmock("@earendil-works/pi-tui");
 		vi.doUnmock("../config.ts");
 		vi.doUnmock("../overlay-component.ts");
-		vi.doUnmock("../reattach-overlay.ts");
 		vi.doUnmock("../pty-session.ts");
 		vi.doUnmock("../headless-monitor.ts");
 		vi.doUnmock("../background-widget.ts");

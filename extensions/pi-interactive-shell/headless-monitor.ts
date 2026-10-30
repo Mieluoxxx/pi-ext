@@ -193,7 +193,7 @@ export class HeadlessDispatchMonitor {
 		if (!monitor || monitor.strategy !== "poll-diff") return;
 		this.pollInFlight = true;
 		try {
-			const raw = this.session.getRawStream({ sinceLast: false, stripAnsi: true });
+			const raw = this.session.getRawStream({ stripAnsi: true });
 			if (this.pollReadOffset > raw.length) {
 				this.pollReadOffset = raw.length;
 			}

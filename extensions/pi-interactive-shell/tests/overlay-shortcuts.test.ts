@@ -36,9 +36,6 @@ async function setupHarness(): Promise<Harness> {
 	vi.doMock("../overlay-component.ts", () => ({
 		InteractiveShellOverlay: class MockInteractiveShellOverlay {},
 	}));
-	vi.doMock("../reattach-overlay.ts", () => ({
-		ReattachOverlay: class MockReattachOverlay {},
-	}));
 	vi.doMock("../pty-session.ts", () => ({
 		PtyTerminalSession: class MockPtyTerminalSession {},
 	}));
@@ -153,7 +150,6 @@ describe("overlay focus and side-chat guards", () => {
 		vi.doUnmock("@earendil-works/pi-coding-agent");
 		vi.doUnmock("@earendil-works/pi-tui");
 		vi.doUnmock("../overlay-component.ts");
-		vi.doUnmock("../reattach-overlay.ts");
 		vi.doUnmock("../pty-session.ts");
 		vi.doUnmock("../headless-monitor.ts");
 		vi.doUnmock("../background-widget.ts");

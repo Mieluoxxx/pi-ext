@@ -56,9 +56,6 @@ async function setupKillHarness(options: SetupOptions = {}) {
 	vi.doMock("../overlay-component.ts", () => ({
 		InteractiveShellOverlay: class MockInteractiveShellOverlay {},
 	}));
-	vi.doMock("../reattach-overlay.ts", () => ({
-		ReattachOverlay: class MockReattachOverlay {},
-	}));
 	vi.doMock("../session-manager.ts", () => ({
 		sessionManager,
 		generateSessionId: () => "mock-session-id",
@@ -122,7 +119,6 @@ describe("session kill completion suppression", () => {
 		vi.doUnmock("@earendil-works/pi-coding-agent");
 		vi.doUnmock("@earendil-works/pi-tui");
 		vi.doUnmock("../overlay-component.ts");
-		vi.doUnmock("../reattach-overlay.ts");
 		vi.doUnmock("../runtime-coordinator.ts");
 		vi.doUnmock("../session-manager.ts");
 	});

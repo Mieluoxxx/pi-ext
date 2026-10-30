@@ -45,7 +45,6 @@
     "overlay-component.ts",
     "pty-session.ts",
     "shell-resolution.ts",
-    "reattach-overlay.ts",
     "session-manager.ts",
     "tool-schema.ts",
     "tool-contract.ts",

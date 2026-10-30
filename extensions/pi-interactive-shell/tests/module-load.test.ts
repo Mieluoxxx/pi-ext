@@ -16,9 +16,7 @@ describe("module smoke loads", () => {
 
 		const extension = await import("../index.ts");
 		const overlay = await import("../overlay-component.ts");
-		const reattach = await import("../reattach-overlay.ts");
 		expect(typeof extension.default).toBe("function");
 		expect(typeof overlay.InteractiveShellOverlay).toBe("function");
-		expect(typeof reattach.ReattachOverlay).toBe("function");
 	});
 });

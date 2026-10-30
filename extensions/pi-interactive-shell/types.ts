@@ -146,6 +146,12 @@ export interface InteractiveShellOptions {
 	streamingMode?: boolean;
 	// Existing PTY session (for attach flow -- skip creating a new PTY)
 	existingSession?: import("./pty-session.ts").PtyTerminalSession;
+	/**
+	 * On `dispose()`, detach instead of killing: the PTY belongs to someone who
+	 * kept it after the overlay closed. Without this a host teardown (reload, new
+	 * session) SIGKILLs a background process the user still relies on.
+	 */
+	detachOnDispose?: boolean;
 	onUnfocus?: () => void;
 }
 

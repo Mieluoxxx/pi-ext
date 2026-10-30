@@ -16,7 +16,7 @@ import {
 	formatShortcut,
 } from "./types.ts";
 import { captureCompletionOutput, captureTransferOutput, maybeBuildHandoffPreview, maybeWriteHandoffSnapshot } from "./handoff-utils.ts";
-import { createSessionQueryState, getSessionOutput } from "./session-query.ts";
+import { createSessionQueryState, getSessionOutput, seedDrainPosition } from "./session-query.ts";
 import { DEFAULT_PI_SETTLEMENT_MAX_WAIT_MS, judgeQuiet, readPiSettlement } from "./pi-settlement.ts";
 
 export class InteractiveShellOverlay implements Component, Focusable {
@@ -55,6 +55,8 @@ export class InteractiveShellOverlay implements Component, Focusable {
 	private updateMode: "on-quiet" | "interval";
 	private quietTimer: ReturnType<typeof setTimeout> | null = null;
 	private hasUnsentData = false;
+	/** Byte offset into the PTY's raw buffer for hands-free updates; this reader owns it. */
+	private handsFreeReadOffset = 0;
 	/** Private session directory of a spawned pi child; absent when settlement is unobservable. */
 	private piSessionDir: string | undefined;
 	private settlementMaxWait: number;
@@ -224,7 +226,7 @@ export class InteractiveShellOverlay implements Component, Focusable {
 
 	/** Get rendered terminal output (last N lines, truncated if too large) */
 	getOutputSinceLastCheck(options: { skipRateLimit?: boolean; lines?: number; maxChars?: number; offset?: number; drain?: boolean; incremental?: boolean } | boolean = false): { output: string; truncated: boolean; totalBytes: number; totalLines?: number; hasMore?: boolean; rateLimited?: boolean; waitSeconds?: number } {
-		return getSessionOutput(this.session, this.config, this.queryState, options, this.completionResult?.completionOutput);
+		return getSessionOutput(this.session, this.config, this.queryState, options, this.completionResult?.completionOutput, this.sessionId ?? undefined);
 	}
 
 	/** Get current session status */
@@ -491,8 +493,11 @@ export class InteractiveShellOverlay implements Component, Focusable {
 
 		// Only include content if budget not exhausted
 		if (!this.budgetExhausted) {
-			// Get incremental output since last update
-			let newOutput = this.session.getRawStream({ sinceLast: true, stripAnsi: true });
+			// Get incremental output since the last update, from our own cursor: a shared
+			// one lets an agent `drain` consume the bytes this update still needs.
+			const read = this.session.readStreamFrom({ from: this.handsFreeReadOffset, stripAnsi: true });
+			this.handsFreeReadOffset = read.nextOffset;
+			let newOutput = read.output;
 
 			// Truncate if exceeds per-update limit
 			if (newOutput.length > maxChars) {
@@ -1134,7 +1139,14 @@ export class InteractiveShellOverlay implements Component, Focusable {
 			this.renderTimeout = null;
 		}
 		// Safety cleanup in case dispose() is called without going through finishWith*
-		// If session hasn't completed yet, kill it to prevent orphaned processes
+		// An attached session belongs to a background owner: detach and let it live, or a
+		// host teardown (reload, new session) would SIGKILL a process the user still needs.
+		// Detaching owns nothing the owner needs, so it applies on every path.
+		if (this.options.detachOnDispose) {
+			this.session.setEventHandlers({});
+			this.unregisterActiveSession(false);
+			return;
+		}
 		if (!this.completionResult) {
 			this.session.kill();
 			this.disposeTerminalSession();

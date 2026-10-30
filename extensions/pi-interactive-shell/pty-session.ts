@@ -152,7 +152,8 @@ export class PtyTerminalSession {
 
 	// Raw output buffer for incremental streaming
 	private rawOutput = "";
-	private lastStreamPosition = 0;
+	/** Bytes dropped from the front of `rawOutput` by trimming; offsets handed to callers are absolute. */
+	private trimBase = 0;
 
 	// Write queue for ordered terminal writes
 	private writeQueue = new WriteQueue();
@@ -165,9 +166,11 @@ export class PtyTerminalSession {
 
 	// Trim raw output buffer if it exceeds max size
 	private trimRawOutputIfNeeded(): void {
-		const trimmed = trimRawOutput(this.rawOutput, this.lastStreamPosition);
+		const trimmed = trimRawOutput(this.rawOutput);
 		this.rawOutput = trimmed.rawOutput;
-		this.lastStreamPosition = trimmed.lastStreamPosition;
+		// Readers hold absolute offsets; remember what fell off so their cursors still
+		// mean the same byte once the buffer shrinks.
+		this.trimBase += trimmed.trimAmount;
 	}
 
 	constructor(options: PtySessionOptions, events: PtySessionEvents = {}) {
@@ -537,19 +540,37 @@ export class PtyTerminalSession {
 	}
 
 	/**
-	 * Get raw output stream with optional incremental reading.
-	 * @param options.sinceLast - If true, only return output since last call
+	 * Read raw output from an explicit cursor.
+	 *
+	 * The cursor belongs to the caller, never to the terminal: a shared "last
+	 * position" field let one reader consume bytes another reader still needed.
+	 * Offsets are absolute across trims. Store the returned `nextOffset`, not
+	 * `output.length` — ANSI stripping makes the two different lengths.
+	 * @param options.from - Absolute byte offset into the stream so far.
 	 * @param options.stripAnsi - If true, strip ANSI escape codes (default: true)
 	 */
-	getRawStream(options: { sinceLast?: boolean; stripAnsi?: boolean } = {}): string {
-		let output: string;
+	readStreamFrom(options: { from?: number; stripAnsi?: boolean } = {}): { output: string; nextOffset: number } {
+		// Trimming drops the front of the buffer, so an absolute offset means nothing
+		// until it is rebased; a cursor that fell off entirely resumes at the new head.
+		const absolute = Math.max(this.trimBase, options.from ?? this.trimBase);
+		const from = Math.min(absolute - this.trimBase, this.rawOutput.length);
+		let output = this.rawOutput.substring(from);
 
-		if (options.sinceLast) {
-			output = this.rawOutput.substring(this.lastStreamPosition);
-			this.lastStreamPosition = this.rawOutput.length;
-		} else {
-			output = this.rawOutput;
+		// Strip ANSI codes and control characters by default using Node.js built-in
+		if (options.stripAnsi !== false && output) {
+			output = stripVTControlCharacters(output);
 		}
+
+		return { output, nextOffset: this.trimBase + this.rawOutput.length };
+	}
+
+	/**
+	 * Whole raw buffer, newest-anchored. Prefer `readStreamFrom` when a caller needs
+	 * an incremental cursor: this shares no state and cannot steal another reader's.
+	 * @param options.stripAnsi - If true, strip ANSI escape codes (default: true)
+	 */
+	getRawStream(options: { stripAnsi?: boolean } = {}): string {
+		let output = this.rawOutput;
 
 		// Strip ANSI codes and control characters by default using Node.js built-in
 		if (options.stripAnsi !== false && output) {

@@ -2,15 +2,15 @@ import { stripVTControlCharacters } from "node:util";
 
 export const MAX_RAW_OUTPUT_SIZE = 1024 * 1024;
 
-export function trimRawOutput(rawOutput: string, lastStreamPosition: number): { rawOutput: string; lastStreamPosition: number } {
+export function trimRawOutput(rawOutput: string): { rawOutput: string; trimAmount: number } {
 	if (rawOutput.length <= MAX_RAW_OUTPUT_SIZE) {
-		return { rawOutput, lastStreamPosition };
+		return { rawOutput, trimAmount: 0 };
 	}
 	const keepSize = Math.floor(MAX_RAW_OUTPUT_SIZE / 2);
 	const trimAmount = rawOutput.length - keepSize;
 	return {
 		rawOutput: rawOutput.substring(trimAmount),
-		lastStreamPosition: Math.max(0, lastStreamPosition - trimAmount),
+		trimAmount,
 	};
 }
 

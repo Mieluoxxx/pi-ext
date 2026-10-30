@@ -79,9 +79,6 @@ async function setupHarness(failMonitor = false) {
 	vi.doMock("../overlay-component.ts", () => ({
 		InteractiveShellOverlay: class MockInteractiveShellOverlay {},
 	}));
-	vi.doMock("../reattach-overlay.ts", () => ({
-		ReattachOverlay: class MockReattachOverlay {},
-	}));
 	vi.doMock("../pty-session.ts", () => ({
 		PtyTerminalSession: class MockPtyTerminalSession {
 			exited = false;
@@ -264,7 +261,6 @@ describe("monitor mode", () => {
 		vi.doUnmock("@earendil-works/pi-tui");
 		vi.doUnmock("../config.ts");
 		vi.doUnmock("../overlay-component.ts");
-		vi.doUnmock("../reattach-overlay.ts");
 		vi.doUnmock("../pty-session.ts");
 		vi.doUnmock("../headless-monitor.ts");
 		vi.doUnmock("../session-manager.ts");

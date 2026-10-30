@@ -15,9 +15,6 @@ vi.mock("@earendil-works/pi-tui", () => ({
 vi.mock("../overlay-component.ts", () => ({
 	InteractiveShellOverlay: class MockInteractiveShellOverlay {},
 }));
-vi.mock("../reattach-overlay.ts", () => ({
-	ReattachOverlay: class MockReattachOverlay {},
-}));
 
 const { default: interactiveShellExtension } = await import("../index.ts");
 const { sessionManager } = await import("../session-manager.ts");
