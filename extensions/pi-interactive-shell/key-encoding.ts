@@ -146,12 +146,12 @@ function encodeKeyToken(token: string): string {
 	if (!normalized) return "";
 
 	// Check for direct match in named keys
-	if (NAMED_KEYS[normalized]) {
+	if (Object.hasOwn(NAMED_KEYS, normalized)) {
 		return NAMED_KEYS[normalized];
 	}
 
 	// Check for ctrl+key
-	if (CTRL_KEYS[normalized]) {
+	if (Object.hasOwn(CTRL_KEYS, normalized)) {
 		return CTRL_KEYS[normalized];
 	}
 
@@ -190,7 +190,7 @@ function encodeKeyToken(token: string): string {
 	}
 
 	// Check if base key is a named key that supports modifiers
-	const baseSeq = NAMED_KEYS[rest];
+	const baseSeq = Object.hasOwn(NAMED_KEYS, rest) ? NAMED_KEYS[rest] : undefined;
 	if (baseSeq && MODIFIABLE_KEYS.has(rest) && (ctrl || alt || shift)) {
 		const mod = xtermModifier(shift, alt, ctrl);
 		if (mod > 1) {
@@ -225,8 +225,29 @@ function encodeKeyToken(token: string): string {
 		return baseSeq;
 	}
 
-	// Unknown key, return as literal
-	return token;
+	const close = Object.keys(NAMED_KEYS)
+		.map((name) => ({ name, distance: editDistance(name, rest) }))
+		.filter(({ distance }) => distance <= 2)
+		.sort((a, b) => a.distance - b.distance)
+		.slice(0, 3)
+		.map(({ name }) => name);
+	throw new Error(
+		`Unknown key "${token}" in inputKeys.${close.length ? ` Did you mean ${close.join(", ")}?` : ""} ` +
+		"Use a named key (up, enter, escape, tab, space, backspace, delete, home, end, pageup, pagedown, f1-f12, kp0-kp9) " +
+		"or a single character, optionally prefixed with ctrl+/alt+/shift+ (or c-/m-/s-). Send text with input.",
+	);
+}
+
+function editDistance(a: string, b: string): number {
+	let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+	for (let i = 1; i <= a.length; i++) {
+		const row = [i];
+		for (let j = 1; j <= b.length; j++) {
+			row[j] = Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+		}
+		prev = row;
+	}
+	return prev[b.length];
 }
 
 // Kitty CSI-u and xterm modifyOtherKeys key reports (what the outer terminal
@@ -245,8 +266,13 @@ export function toLegacyInput(data: string): string {
 		const keyId = parseKey(sequence);
 		if (!keyId) return sequence;
 		if (keyId.length === 1) return keyId;
-		const legacy = encodeKeyToken(keyId);
-		return legacy === keyId ? sequence : legacy;
+		try {
+			const legacy = encodeKeyToken(keyId);
+			return legacy === keyId ? sequence : legacy;
+		} catch {
+			// Reports for keys this encoder cannot express stay untouched.
+			return sequence;
+		}
 	});
 }
 
@@ -265,12 +291,8 @@ export function translateInput(input: InputSpec): string {
 		for (const raw of input.hex) {
 			const trimmed = raw.trim().toLowerCase();
 			const normalized = trimmed.startsWith("0x") ? trimmed.slice(2) : trimmed;
-			if (/^[0-9a-f]{1,2}$/.test(normalized)) {
-				const value = Number.parseInt(normalized, 16);
-				if (!Number.isNaN(value) && value >= 0 && value <= 0xff) {
-					result += String.fromCharCode(value);
-				}
-			}
+			if (!/^[0-9a-f]{1,2}$/.test(normalized)) throw new Error(`Invalid inputHex byte "${raw}": use one byte from 0x00 to 0xff, for example "0x1b".`);
+			result += String.fromCharCode(Number.parseInt(normalized, 16));
 		}
 	}
 

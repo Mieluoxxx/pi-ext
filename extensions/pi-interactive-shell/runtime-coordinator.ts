@@ -27,16 +27,25 @@ export class InteractiveShellCoordinator {
 	private agentHandledCompletion = new Set<string>();
 	private extensionApi: ExtensionAPI | null = null;
 	private pendingApiTasks: Array<(pi: ExtensionAPI) => void> = [];
+	private runtimeEpoch = 0;
 
 	bindExtensionApi(pi: ExtensionAPI): void {
+		if (this.extensionApi === pi) return;
+		this.runtimeEpoch += 1;
 		this.extensionApi = pi;
 		const pending = this.pendingApiTasks.splice(0);
 		for (const task of pending) task(pi);
 	}
 
 	unbindExtensionApi(pi: ExtensionAPI): void {
-		if (this.extensionApi === pi) this.extensionApi = null;
+		if (this.extensionApi !== pi) return;
+		this.extensionApi = null;
+		this.runtimeEpoch += 1;
 	}
+
+	getRuntimeEpoch(): number { return this.runtimeEpoch; }
+
+	isRuntimeEpochCurrent(epoch: number): boolean { return epoch === this.runtimeEpoch; }
 
 	runWithExtensionApi(task: (pi: ExtensionAPI) => void): void {
 		if (this.extensionApi) {

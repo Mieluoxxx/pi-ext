@@ -6,7 +6,8 @@ import { join } from "node:path";
 describe("real monitor lifecycle", () => {
 	let root: string;
 	let tool: any;
-	let shutdown: ((event: { reason: string }) => void) | undefined;
+	let shutdown: ((...args: any[]) => void) | undefined;
+	let start: ((...args: any[]) => void) | undefined;
 	let messages: any[];
 	const command = (script: string) => `${JSON.stringify(process.execPath)} -e '${script.replaceAll("'", "'\\''")}'`;
 	const call = (params: unknown) => tool.execute("fixture", params, undefined, undefined, { cwd: root, hasUI: false, ui: {} });
@@ -24,9 +25,14 @@ describe("real monitor lifecycle", () => {
 		extension({
 			registerTool(definition: any) { if (definition.name === "interactive_shell") tool = definition; },
 			registerCommand() {}, registerShortcut() {},
-			on(name: string, handler: (event: { reason: string }) => void) { if (name === "session_shutdown") shutdown = handler; },
+			on(name: string, handler: (...args: any[]) => void) {
+				if (name === "session_shutdown") shutdown = handler;
+				if (name === "session_start") start = handler;
+			},
 			events: { emit() {} }, sendMessage(message: unknown) { messages.push(message); },
 		} as any);
+		// Pi binds action methods only once the session starts.
+		start?.({ reason: "startup" }, { hasUI: false, ui: { notify() {}, onTerminalInput: () => () => {} } });
 	});
 
 	afterEach(() => {

@@ -98,6 +98,7 @@ async function setupExtensionHarness(configOverrides: SpawnConfigOverrides = {})
 
 	const commands = new Map<string, { handler: (args: string, ctx: any) => Promise<void> | void }>();
 	const shortcuts = new Map<string, { handler: (ctx: any) => Promise<void> | void }>();
+	const handlers = new Map<string, (event: any, ctx: any) => void>();
 	let nextCustomResult: any = { exitCode: 0, backgrounded: false, cancelled: false };
 
 	const pi = {
@@ -110,12 +111,14 @@ async function setupExtensionHarness(configOverrides: SpawnConfigOverrides = {})
 		registerTool: vi.fn((tool: any) => {
 			registeredTool = tool;
 		}),
-		on: vi.fn(),
+		on: vi.fn((name: string, handler: (event: any, ctx: any) => void) => handlers.set(name, handler)),
 		events: { emit: vi.fn() },
 		sendMessage: vi.fn(),
 	};
 
 	extension(pi as any);
+	// Pi binds action methods only once the session starts.
+	handlers.get("session_start")?.({ reason: "startup" }, { hasUI: false, ui: { notify: vi.fn(), onTerminalInput: () => () => {} } });
 
 	const notify = vi.fn();
 	const custom = vi.fn(async (factory: (tui: any, theme: any, kb: any, done: (result: unknown) => void) => unknown) => {

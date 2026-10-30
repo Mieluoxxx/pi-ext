@@ -151,6 +151,8 @@ async function setupHarness(failMonitor = false) {
 		events: { emit: vi.fn() },
 		sendMessage,
 	} as any);
+	// Pi binds action methods only once the session starts.
+	handlers.get("session_start")?.({ reason: "startup" }, { hasUI: false, ui: { notify: vi.fn(), onTerminalInput: () => () => {} } });
 
 	return {
 		toolDef,

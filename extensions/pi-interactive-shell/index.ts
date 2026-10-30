@@ -643,22 +643,24 @@ function registerHeadlessActive(
 	});
 }
 
-function makeNonBlockingUpdateHandler(pi: ExtensionAPI): (update: HandsFreeUpdate) => void {
+// Overlay sessions survive /reload, so their callbacks must reach the currently bound API.
+function makeNonBlockingUpdateHandler(): (update: HandsFreeUpdate) => void {
 	return (update) => {
-		pi.events.emit("interactive-shell:update", update);
-		const message = buildHandsFreeUpdateMessage(update);
-		if (!message) return;
-		pi.sendMessage({
-			customType: "interactive-shell-update",
-			content: message.content,
-			display: true,
-			details: message.details,
-		}, { triggerTurn: true });
+		coordinator.runWithExtensionApi((activePi) => {
+			activePi.events.emit("interactive-shell:update", update);
+			const message = buildHandsFreeUpdateMessage(update);
+			if (!message) return;
+			activePi.sendMessage({
+				customType: "interactive-shell-update",
+				content: message.content,
+				display: true,
+				details: message.details,
+			}, { triggerTurn: true });
+		});
 	};
 }
 
 function emitTransferredOutput(
-	pi: ExtensionAPI,
 	result: InteractiveShellResult,
 	fallbackSessionId?: string,
 ): void {
@@ -671,22 +673,24 @@ function emitTransferredOutput(
 		? `Session ${sessionId} output transferred`
 		: "Interactive shell output transferred";
 	const content = `${prefix} (${result.transferred.lines.length} lines${truncatedNote}):\n\n${result.transferred.lines.join("\n")}`;
-	pi.sendMessage({
-		customType: "interactive-shell-transfer",
-		content,
-		display: true,
-		details: {
+	coordinator.runWithExtensionApi((activePi) => {
+		activePi.sendMessage({
+			customType: "interactive-shell-transfer",
+			content,
+			display: true,
+			details: {
+				sessionId,
+				transferred: result.transferred,
+				exitCode: result.exitCode,
+				signal: result.signal,
+			},
+		}, { triggerTurn: true });
+		activePi.events.emit("interactive-shell:transfer", {
 			sessionId,
 			transferred: result.transferred,
 			exitCode: result.exitCode,
 			signal: result.signal,
-		},
-	}, { triggerTurn: true });
-	pi.events.emit("interactive-shell:transfer", {
-		sessionId,
-		transferred: result.transferred,
-		exitCode: result.exitCode,
-		signal: result.signal,
+		});
 	});
 }
 
@@ -710,7 +714,6 @@ function failHeadlessStart(id: string, session: PtyTerminalSession | undefined, 
 }
 
 export default function interactiveShellExtension(pi: ExtensionAPI) {
-	coordinator.bindExtensionApi(pi);
 	const startupConfig = loadConfig(process.cwd());
 	const supportsDeferredTools = typeof pi.getActiveTools === "function" && typeof pi.setActiveTools === "function";
 	const deferToolLoading = startupConfig.defer && supportsDeferredTools;
@@ -784,6 +787,7 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 			return;
 		}
 		try {
+			const epoch = coordinator.getRuntimeEpoch();
 			const result = await ctx.ui.custom<InteractiveShellResult>(
 				(tui, theme, _kb, done) =>
 					new InteractiveShellOverlay(tui, theme, {
@@ -795,10 +799,11 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 					}, config, done),
 				createOverlayUiOptions(config),
 			);
-			if (spawn.spawn.worktreePath) {
+			// A /reload while the overlay was open leaves this command ctx stale.
+			if (spawn.spawn.worktreePath && coordinator.isRuntimeEpochCurrent(epoch)) {
 				ctx.ui.notify(`Worktree left in place: ${spawn.spawn.worktreePath}`, "info");
 			}
-			emitTransferredOutput(pi, result);
+			emitTransferredOutput(result);
 		} finally {
 			coordinator.endOverlay();
 		}
@@ -1041,7 +1046,7 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 							autoExitGracePeriod: handsFree?.gracePeriod ?? config.autoExitGracePeriod,
 							onUnfocus: () => coordinator.unfocusOverlay(),
 							onHandsFreeUpdate: effectiveMode === "hands-free"
-								? makeNonBlockingUpdateHandler(pi)
+								? makeNonBlockingUpdateHandler()
 								: undefined,
 							handoffPreviewEnabled: handoffPreview?.enabled,
 							handoffPreviewLines: handoffPreview?.lines,
@@ -1058,7 +1063,7 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 				throw error;
 			}
 
-			setupDispatchCompletion(pi, overlayPromise, config, {
+			setupDispatchCompletion(overlayPromise, config, {
 				id: generatedSessionId,
 				mode: effectiveMode,
 				command: launchCommand,
@@ -1149,7 +1154,7 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 										userTookOver: update.userTookOver,
 									},
 								});
-								pi.events.emit("interactive-shell:update", update);
+								coordinator.runWithExtensionApi((activePi) => activePi.events.emit("interactive-shell:update", update));
 							}
 							: undefined,
 						handoffPreviewEnabled: handoffPreview?.enabled,
@@ -1694,7 +1699,7 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 								autoExitGracePeriod: handsFree?.gracePeriod ?? config.autoExitGracePeriod,
 								onUnfocus: () => coordinator.unfocusOverlay(),
 								onHandsFreeUpdate: mode === "hands-free"
-									? makeNonBlockingUpdateHandler(pi)
+									? makeNonBlockingUpdateHandler()
 									: undefined,
 								handoffPreviewEnabled: handoffPreview?.enabled,
 								handoffPreviewLines: handoffPreview?.lines,
@@ -1713,7 +1718,7 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 				}
 
 				if (isNonBlocking) {
-					setupDispatchCompletion(pi, overlayPromise, config, {
+					setupDispatchCompletion(overlayPromise, config, {
 						id: reattachSessionId,
 						mode: mode!,
 						command: bgSession.command,
@@ -1926,7 +1931,7 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 					createOverlayUiOptions(config),
 				);
 
-				emitTransferredOutput(pi, result, targetId);
+				emitTransferredOutput(result, targetId);
 
 				if (monitor && !monitor.disposed) {
 					if (!result.backgrounded) {
@@ -2001,7 +2006,6 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 }
 
 function setupDispatchCompletion(
-	pi: ExtensionAPI,
 	overlayPromise: Promise<InteractiveShellResult>,
 	config: InteractiveShellConfig,
 	ctx: {
@@ -2023,7 +2027,7 @@ function setupDispatchCompletion(
 		const wasAgentInitiated = coordinator.consumeAgentHandledCompletion(id);
 
 		if (result.transferred) {
-			emitTransferredOutput(pi, result, id);
+			emitTransferredOutput(result, id);
 			sessionManager.unregisterActive(id, true);
 			coordinator.disposeMonitor(id);
 			return;
@@ -2031,12 +2035,14 @@ function setupDispatchCompletion(
 
 		if (mode === "dispatch" && result.backgrounded) {
 			if (!wasAgentInitiated) {
-				pi.sendMessage({
-					customType: "interactive-shell-transfer",
-					content: `Session ${id} moved to background (id: ${result.backgroundId}).`,
-					display: true,
-					details: { sessionId: id, backgroundId: result.backgroundId },
-				}, { triggerTurn: true });
+				coordinator.runWithExtensionApi((activePi) => {
+					activePi.sendMessage({
+						customType: "interactive-shell-transfer",
+						content: `Session ${id} moved to background (id: ${result.backgroundId}).`,
+						display: true,
+						details: { sessionId: id, backgroundId: result.backgroundId },
+					}, { triggerTurn: true });
+				});
 			}
 
 			const bgId = result.backgroundId!;
@@ -2071,23 +2077,25 @@ function setupDispatchCompletion(
 		}
 
 		if (mode === "dispatch") {
-			if (!wasAgentInitiated) {
-				const content = buildResultNotification(id, result);
-				pi.sendMessage({
-					customType: "interactive-shell-transfer",
-					content,
-					display: true,
-					details: { sessionId: id, exitCode: result.exitCode, signal: result.signal, completionReason: result.completionReason, timedOut: result.timedOut, cancelled: result.cancelled, completionOutput: result.completionOutput },
-				}, { triggerTurn: true });
-			}
-			pi.events.emit("interactive-shell:transfer", {
-				sessionId: id,
-				completionReason: result.completionReason,
-				completionOutput: result.completionOutput,
-				exitCode: result.exitCode,
-				signal: result.signal,
-				timedOut: result.timedOut,
-				cancelled: result.cancelled,
+			coordinator.runWithExtensionApi((activePi) => {
+				if (!wasAgentInitiated) {
+					const content = buildResultNotification(id, result);
+					activePi.sendMessage({
+						customType: "interactive-shell-transfer",
+						content,
+						display: true,
+						details: { sessionId: id, exitCode: result.exitCode, signal: result.signal, completionReason: result.completionReason, timedOut: result.timedOut, cancelled: result.cancelled, completionOutput: result.completionOutput },
+					}, { triggerTurn: true });
+				}
+				activePi.events.emit("interactive-shell:transfer", {
+					sessionId: id,
+					completionReason: result.completionReason,
+					completionOutput: result.completionOutput,
+					exitCode: result.exitCode,
+					signal: result.signal,
+					timedOut: result.timedOut,
+					cancelled: result.cancelled,
+				});
 			});
 			sessionManager.scheduleCleanup(id, 5 * 60 * 1000);
 			coordinator.disposeMonitor(id);

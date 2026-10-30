@@ -232,6 +232,7 @@ Ported from [nicobailon/pi-interactive-shell](https://github.com/nicobailon/pi-i
 - Machine-readable `completionReason` (`1342ccf`) and five-minute completed dispatch output (`9a01bde`).
 - Global `launchPolicy` (`846b02b` + `1fc6388`).
 - `/reload` survival for background sessions and monitors (`62c047a` + prototype re-attach from `1b7a029`) and the compact background widget.
+- Callbacks of sessions that outlive `/reload` follow the active API, bound at `session_start` (`3572073`, `dacfd39`), and unknown `inputKeys`/`inputHex` values error instead of reaching the PTY (`129a839`). Remaining 0.18.0 changes are not ported yet: completion output logs (`70a72fe`), the lean tool schema (`a37250d`), and the semantic-schema provider fixes (`e9237fe`, `04fb78e`).
 
 Deliberately not ported: Jev semantic supervision and recoverable output selection (external API, credentials, ~2000 lines; revisit if semantic monitoring is needed), and the Linux PTY completion rework (`981ca32`, 500 lines of Linux-specific plumbing) until Linux tail-output loss is actually observed.
 

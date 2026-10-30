@@ -2,6 +2,13 @@
 
 All notable changes to the `pi-interactive-shell` extension will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- Route overlay update, transfer, and dispatch-completion messages through the currently bound ExtensionAPI, and bind only at `session_start`. Sessions that outlive `/reload` no longer deliver callbacks into the reloaded factory's stale API, which previously failed the extension load or crashed Pi (`3572073`, `dacfd39`).
+- Skip the `/spawn --worktree` closing notice when a `/reload` replaced the command context while the overlay was open (`dacfd39`).
+- Reject unknown `inputKeys` names and malformed `inputHex` bytes with an error that suggests valid keys, instead of typing the name into the terminal or dropping the byte (`129a839`).
+
 ## [0.16.2] - 2026-10-27
 
 ### Fixed

@@ -18,6 +18,13 @@ describe("translateInput", () => {
 	it("supports xterm modifier encoding for CSI keys", () => {
 		expect(translateInput({ keys: ["ctrl+alt+delete", "s-up"] })).toBe("\x1b[3;7~\x1b[1;2A");
 	});
+
+	it("rejects unknown key names and hex bytes instead of typing them", () => {
+		expect(() => translateInput({ keys: ["pagedwn"] })).toThrow('Unknown key "pagedwn" in inputKeys. Did you mean pagedown');
+		expect(() => translateInput({ keys: ["ctrl+foo"] })).toThrow('Unknown key "ctrl+foo"');
+		expect(() => translateInput({ keys: ["constructor"] })).toThrow('Unknown key "constructor"');
+		expect(() => translateInput({ hex: ["\\x1b"] })).toThrow('Invalid inputHex byte "\\x1b"');
+	});
 });
 
 describe("toLegacyInput", () => {
