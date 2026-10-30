@@ -54,6 +54,8 @@
     "background-widget.ts",
     "handoff-utils.ts",
     "notification-utils.ts",
+    "pi-settlement.ts",
+    "pi-settlement-watcher.ts",
     "pty-log.ts",
     "pty-protocol.ts",
     "runtime-coordinator.ts",

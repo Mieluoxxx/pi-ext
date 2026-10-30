@@ -1,6 +1,8 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import type { InteractiveShellConfig, SpawnAgent } from "./config.ts";
 
 export type SpawnMode = "fresh" | "fork";
@@ -56,6 +58,79 @@ export interface ResolvedSpawn {
 	cwd: string;
 	reason: string;
 	worktreePath?: string;
+	/** Private session directory of a spawned pi child, when we chose its layout. */
+	piSessionDir?: string;
+}
+
+/** A private session directory reserved for one spawned pi child. */
+export interface PiSessionRun {
+	dir: string;
+	id: string;
+}
+
+const PI_SESSION_RUN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Session-selection flags that make the child's session file impossible to predict. */
+const PI_SESSION_FLAGS = new Set([
+	"--session",
+	"--session-id",
+	"--session-dir",
+	"--continue",
+	"--resume",
+	"--fork",
+	"--no-session",
+	"-c",
+	"-r",
+]);
+
+function piSessionsRoot(): string {
+	return join(getAgentDir(), "interactive-shell", "pi-sessions");
+}
+
+/**
+ * Reserve a private `--session-dir` for one pi child so its transcript is
+ * readable while it runs. Old runs are pruned here, not on completion, because
+ * a settled child's transcript is still the evidence a parent may query.
+ */
+export function createPiSessionRun(): PiSessionRun {
+	const root = piSessionsRoot();
+	const id = `shell-${randomBytes(4).toString("hex")}`;
+	const dir = join(root, id, "session");
+	mkdirSync(dir, { recursive: true, mode: 0o700 });
+	pruneStalePiSessions(root);
+	return { dir, id };
+}
+
+/** Drop a reserved run whose launch never happened. */
+export function removePiSessionRun(run: PiSessionRun): void {
+	try {
+		rmSync(join(piSessionsRoot(), run.id), { recursive: true, force: true });
+	} catch {
+		// A failed cleanup must not mask the launch failure that caused it.
+	}
+}
+
+function pruneStalePiSessions(root: string): void {
+	let entries: string[];
+	try {
+		entries = readdirSync(root);
+	} catch {
+		return;
+	}
+	const cutoff = Date.now() - PI_SESSION_RUN_TTL_MS;
+	for (const entry of entries) {
+		const path = join(root, entry);
+		try {
+			if (statSync(path).mtimeMs < cutoff) rmSync(path, { recursive: true, force: true });
+		} catch {
+			// A concurrent prune or an unreadable entry is not worth a failure.
+		}
+	}
+}
+
+/** True when configured args already pick a session, so ours would conflict or lie. */
+function hasPiSessionFlag(args: string[]): boolean {
+	return args.some((arg) => PI_SESSION_FLAGS.has(arg) || arg.startsWith("--session="));
 }
 
 export function parseSpawnArgs(args: string, agents: readonly SpawnAgent[]):
@@ -152,7 +227,7 @@ export function resolveSpawn(
 	cwd: string,
 	request: SpawnRequest | undefined,
 	getSessionFile: () => string | undefined,
-	options: { createWorktree?: boolean } = {},
+	options: { createWorktree?: boolean; piSession?: PiSessionRun } = {},
 ):
 	| { ok: true; spawn: ResolvedSpawn }
 	| { ok: false; error: string } {
@@ -198,9 +273,21 @@ export function resolveSpawn(
 	const args = Object.hasOwn(config.spawn.defaultArgs, agent) ? [...config.spawn.defaultArgs[agent]] : [];
 	let reason = `spawn ${agent} (${mode === "fork" ? "fork current session" : "fresh session"})`;
 
+	// Check before adding our own flags: `--fork` combines with `--session-id`,
+	// but a user-chosen session cannot be predicted.
+	const userPickedSession = hasPiSessionFlag(args);
+
 	if (sourceSessionFile) {
 		args.push("--fork", sourceSessionFile);
 	}
+
+	// Own the child's session layout so its transcript can be read while it runs.
+	let piSessionDir: string | undefined;
+	if (agent === "pi" && options.piSession && !userPickedSession) {
+		piSessionDir = options.piSession.dir;
+		args.push("--session-dir", options.piSession.dir, "--session-id", options.piSession.id);
+	}
+
 	if (prompt) {
 		args.push(prompt);
 	}
@@ -216,6 +303,7 @@ export function resolveSpawn(
 		reason,
 	};
 	if (worktreePath !== undefined) resolved.worktreePath = worktreePath;
+	if (piSessionDir !== undefined) resolved.piSessionDir = piSessionDir;
 
 	return { ok: true, spawn: resolved };
 }

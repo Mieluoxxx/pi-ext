@@ -25,7 +25,7 @@ Choose exactly one action. Supply only its parameters; omit unused optional fiel
 
 Minimal examples:
 interactive_shell({ action: "start", command: "vim package.json" })
-interactive_shell({ action: "start", spawn: { agent: "pi", prompt: "Fix the bug", worktree: true }, mode: "dispatch" })
+interactive_shell({ action: "start", spawn: { agent: "pi", prompt: "Fix the bug", worktree: true }, mode: "dispatch", background: true })
 interactive_shell({ action: "query", sessionId: "shell-1" })
 interactive_shell({ action: "send", sessionId: "shell-1", input: "/compact", submit: true })
 interactive_shell({ action: "kill", sessionId: "shell-1" })
@@ -38,6 +38,9 @@ interactive and hands-free return immediately with a sessionId. dispatch notifie
 Query output only when needed (default rate limit: 60s). The user can take over, background, transfer output, or return control. Stop sending input during user takeover. Clean up only sessions created for the task.
 
 Structured spawn supports a prompt field for Pi, Codex, Claude, and Cursor using native CLI startup forms, or any custom key configured by the user. Raw command must include the CLI's startup prompt itself. reason is only a UI label. Prefer isolated worktrees for unattended agents.
+
+A pi spawn in dispatch or hands-free gets a private session directory, so its finished turn is reported instead of inferred from silence: an interactive-shell-settled message arrives with the child's closing text, before any quiet timeout. Write spawn.prompt so that closing message is a self-contained result, because it is what the parent receives. Use hands-free when the child must stay alive for follow-up work (its default autoExitOnQuiet is false, so action: "send" reaches it); a dispatch child stops shortly after its turn settles and its output is then reachable only through action: "attach" for five minutes. Other agents, raw commands, and pi runs whose session cannot be read keep the quiet heuristic (auto-close-quiet); a readable pi turn instead ends the session as agent-settled.
+
 Validation errors perform no operation. Correct the parameters; do not retry unchanged arguments, bypass validation by changing modes, or claim success. Launch failures may leave a worktree; follow the reported resource status.`;
 
 const outputFields = {

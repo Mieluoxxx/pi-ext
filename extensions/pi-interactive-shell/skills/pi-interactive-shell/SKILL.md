@@ -18,11 +18,11 @@ description: Use interactive_shell to operate interactive CLIs, supervise user-a
 | Need | Mode | Behavior |
 | --- | --- | --- |
 | Drive an editor, REPL, or interactive CLI | `interactive` (default) | Opens an overlay and returns a `sessionId` immediately |
-| Supervise a task with progress updates | `hands-free` | Opens an overlay; the user can take control |
-| Delegate a finite task and await completion | `dispatch` | Notifies on completion; no polling needed |
+| Delegate work that may need follow-up turns | `hands-free` | Opens an overlay; emits progress updates; the child stays alive after answering |
+| Delegate one finite task | `dispatch` | Reports completion; the child stops once done |
 | Watch a server, logs, tests, or files | `monitor` | Runs headlessly and notifies on matching events |
 
-Dispatch defaults to quiet auto-close (8s of silence after a 15s startup grace period, configurable), not proof of task completion. Use `handsFree: { autoExitOnQuiet: false }` when silence must not terminate the process. Check the completion reason and actual result before claiming success.
+A `pi` spawn in `dispatch` or `hands-free` reports real turns: when the child finishes one, an `interactive-shell-settled` message arrives with its closing text, before any quiet timeout. Only `hands-free` keeps the child alive for `action: "send"` (its default `autoExitOnQuiet` is false); a `dispatch` child stops shortly after its turn settles (`agent-settled`), and its transcript is then reachable through `action: "attach"` for five minutes. Other agents and raw commands keep the quiet heuristic (8s of silence after a 15s startup grace period by default, both configurable), which is not proof of completion. Check the completion reason and actual result before claiming success.
 
 ## Start
 
@@ -39,7 +39,7 @@ interactive_shell({
 })
 ```
 
-Use `command` for arbitrary CLIs, `spawn` for coding agents. `reason` is an optional UI label, not a subprocess prompt; pass instructions in `spawn.prompt` or the CLI command itself. Structured spawn also supports `codex`, `claude`, `cursor`, and configured agent keys.
+Use `command` for arbitrary CLIs, `spawn` for coding agents. `reason` is an optional UI label, not a subprocess prompt; pass instructions in `spawn.prompt` or the CLI command itself. Structured spawn also supports `codex`, `claude`, `cursor`, and configured agent keys. When you spawn `pi`, write `spawn.prompt` so the child's final message is a self-contained result: that message is what the settlement notice returns. Reply to a finished `hands-free` child with `action: "send"`; it is still running.
 
 ## Monitor
 

@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { HeadlessDispatchMonitor } from "../headless-monitor.ts";
 import type { InteractiveShellConfig } from "../config.ts";
 
@@ -265,5 +268,69 @@ describe("HeadlessDispatchMonitor", () => {
 			matchedText: "changed",
 			stream: "pty",
 		});
+	});
+});
+
+function piSessionDir(entries: Array<{ role: string; text: string; stopReason?: string }>): string {
+	const dir = mkdtempSync(join(tmpdir(), "interactive-shell-monitor-settlement-"));
+	let parentId: string | null = null;
+	const lines = [JSON.stringify({ type: "session", version: 3, id: "child", timestamp: "2026-01-01T00:00:00.000Z", cwd: dir })];
+	entries.forEach((entry, index) => {
+		const id = `e${index}`;
+		const message = entry.role === "assistant"
+			? { role: "assistant", stopReason: entry.stopReason, content: [{ type: "text", text: entry.text }] }
+			: { role: "user", content: [{ type: "text", text: entry.text }] };
+		lines.push(JSON.stringify({ type: "message", id, parentId, message }));
+		parentId = id;
+	});
+	writeFileSync(join(dir, "2026-01-01T00-00-00-000Z_child.jsonl"), `${lines.join("\n")}\n`);
+	return dir;
+}
+
+describe("HeadlessDispatchMonitor pi settlement", () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+	});
+
+	it("keeps a mid-turn pi child alive past the quiet threshold", () => {
+		const session = createSession();
+		const onComplete = vi.fn();
+		new HeadlessDispatchMonitor(session, config, {
+			autoExitOnQuiet: true,
+			quietThreshold: 1000,
+			gracePeriod: 0,
+			startedAt: Date.now(),
+			piSessionDir: piSessionDir([
+				{ role: "user", text: "review the diff" },
+				{ role: "assistant", text: "reading files", stopReason: "toolUse" },
+			]),
+		}, onComplete);
+
+		vi.advanceTimersByTime(5000);
+		expect(session.kill).not.toHaveBeenCalled();
+		expect(onComplete).not.toHaveBeenCalled();
+	});
+
+	it("completes a settled pi child as agent-settled with its closing text", () => {
+		const session = createSession();
+		const onComplete = vi.fn();
+		new HeadlessDispatchMonitor(session, config, {
+			autoExitOnQuiet: true,
+			quietThreshold: 1000,
+			gracePeriod: 0,
+			startedAt: Date.now(),
+			piSessionDir: piSessionDir([
+				{ role: "user", text: "review the diff" },
+				{ role: "assistant", text: "No blocking issues found.", stopReason: "stop" },
+			]),
+		}, onComplete);
+
+		vi.advanceTimersByTime(1000);
+		expect(session.kill).toHaveBeenCalledTimes(1);
+		expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({
+			completionReason: "agent-settled",
+			settlement: { state: "settled", text: "No blocking issues found.", stopReason: "stop", entryId: "e1" },
+		}));
+		expect(onComplete.mock.calls[0]?.[0].cancelled).toBe(false);
 	});
 });

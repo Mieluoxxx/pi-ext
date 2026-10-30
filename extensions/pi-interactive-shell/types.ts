@@ -5,12 +5,27 @@ import type { ToolParams } from "./tool-schema.ts";
 import type { ResolvedShellConfig } from "./shell-resolution.ts";
 
 /** Why a dispatch session ended. `auto-close-quiet` is not a command verdict. */
-export type DispatchCompletionReason = "exited" | "timed-out" | "killed" | "auto-close-quiet";
+/**
+ * Why a dispatch session ended. `auto-close-quiet` and `agent-settled` are
+ * different claims: the first is the quiet heuristic, the second is the child
+ * pi reporting a finished turn through its own session transcript.
+ */
+export type DispatchCompletionReason = "exited" | "timed-out" | "killed" | "auto-close-quiet" | "agent-settled";
+
+/** Closing answer of a spawned pi child, read from its session transcript. */
+export interface PiSettlementResult {
+	text: string;
+	stopReason: string;
+	/** Session entry id of the closing assistant message; identifies one turn. */
+	entryId: string;
+}
 
 export interface InteractiveShellResult {
 	exitCode: number | null;
 	signal?: number;
 	completionReason?: DispatchCompletionReason;
+	/** Present when the child's own session transcript reported a finished turn. */
+	settlement?: PiSettlementResult;
 	backgrounded: boolean;
 	backgroundId?: string;
 	cancelled: boolean;
@@ -43,7 +58,7 @@ export interface InteractiveShellResult {
 }
 
 export interface HandsFreeUpdate {
-	status: "running" | "user-takeover" | "exited" | "killed" | "agent-resumed";
+	status: "running" | "user-takeover" | "exited" | "killed" | "agent-resumed" | "settled";
 	sessionId: string;
 	runtime: number;
 	tail: string[];
@@ -124,6 +139,8 @@ export interface InteractiveShellOptions {
 	autoExitGracePeriod?: number;
 	// Auto-kill timeout
 	timeout?: number;
+	/** Private session directory of a spawned pi child, readable while it runs. */
+	piSessionDir?: string;
 	// When true, unregister active session on completion (blocking tool call path).
 	// When false/undefined, keep registered so agent can query result later.
 	streamingMode?: boolean;

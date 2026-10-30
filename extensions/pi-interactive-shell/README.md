@@ -49,6 +49,12 @@ Ask Pi to open or supervise a CLI, or use the slash commands directly:
 
 Dispatch defaults `autoExitOnQuiet: true` — the session gets a 15s startup grace period before closing after output becomes quiet. The completion notification identifies this as a quiet auto-close, not a user kill.
 
+A `spawn` of `pi` is different: in `dispatch` and `hands-free` the child gets a private session directory, so its own transcript is readable while it runs. When that child finishes a turn, the parent receives an `interactive-shell-settled` notice with the child's closing message, before any quiet timeout.
+
+Whether the child then stays alive depends on the mode. `hands-free` leaves it running (its default `autoExitOnQuiet` is false), so `action: "send"` starts another turn and each finished turn is announced. `dispatch` is one finite task: the child stops shortly after its turn settles (`agent-settled`) and its transcript is reachable through `action: "attach"` for five minutes. A quiet interval is likewise checked against the transcript, and a turn still in progress keeps waiting up to `piSettlementMaxWait` (default 30 minutes). Other agents, plain commands, and pi runs whose session cannot be read keep the quiet heuristic and still report `auto-close-quiet`.
+
+Turn notices apply to `dispatch` and `hands-free` spawns of `pi`. An `interactive` spawn keeps the user's normal session location and has no watcher: the overlay reports the turn directly.
+
 ### Start A Session
 
 Choose an explicit `action`. For `start`, supply `command` or `spawn`, never both. Omit unused fields; strict structured calls may use `null` instead. Empty strings, zeroes, and `false` are values, not absence.
@@ -195,7 +201,8 @@ Global and project configuration files are merged, with project values taking pr
   },
   "minQueryIntervalSeconds": 60,
   "handsFreeQuietThreshold": 8000,
-  "autoExitGracePeriod": 15000
+  "autoExitGracePeriod": 15000,
+  "piSettlementMaxWait": 1800000
 }
 ```
 

@@ -7,6 +7,8 @@ export interface BackgroundSession {
 	reason?: string;
 	session: PtyTerminalSession;
 	startedAt: Date;
+	/** Private session directory of a spawned pi child, carried across attach. */
+	piSessionDir?: string;
 }
 
 export type ActiveSessionStatus = "running" | "monitoring" | "user-takeover" | "exited" | "killed" | "backgrounded";
@@ -204,7 +206,7 @@ export class ShellSessionManager {
 		return true;
 	}
 
-	add(command: string, session: PtyTerminalSession, name?: string, reason?: string, options?: { id?: string; noAutoCleanup?: boolean; startedAt?: Date }): string {
+	add(command: string, session: PtyTerminalSession, name?: string, reason?: string, options?: { id?: string; noAutoCleanup?: boolean; startedAt?: Date; piSessionDir?: string }): string {
 		const id = options?.id ?? generateSessionId(name);
 		if (options?.id) usedIds.add(id);
 		const entry: BackgroundSession = {
@@ -215,6 +217,7 @@ export class ShellSessionManager {
 			session,
 			startedAt: options?.startedAt ?? new Date(),
 		};
+		if (options?.piSessionDir !== undefined) entry.piSessionDir = options.piSessionDir;
 
 		this.storeBackgroundEntry(entry, options?.noAutoCleanup === true);
 		return id;

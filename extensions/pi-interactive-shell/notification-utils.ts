@@ -1,11 +1,27 @@
-import type { InteractiveShellResult, HandsFreeUpdate, MonitorEventPayload, MonitorSessionState } from "./types.ts";
+import type { InteractiveShellResult, HandsFreeUpdate, MonitorEventPayload, MonitorSessionState, PiSettlementResult } from "./types.ts";
 import type { HeadlessCompletionInfo } from "./headless-monitor.ts";
 import { formatDurationMs } from "./types.ts";
 
 const BRIEF_TAIL_LINES = 5;
 
-export function buildDispatchNotification(sessionId: string, info: HeadlessCompletionInfo, duration: string): string {
+export function buildDispatchNotification(
+	sessionId: string,
+	info: HeadlessCompletionInfo,
+	duration: string,
+	options: { omitClosingText?: boolean } = {},
+): string {
 	const parts = [buildDispatchStatusLine(sessionId, info, duration)];
+	if (info.settlement) {
+		// The child's own closing answer beats a terminal tail: it is what it meant to say.
+		if (options.omitClosingText) {
+			parts.push("\nIts closing message was already delivered to you.");
+		} else if (info.settlement.text) {
+			parts.push(`\nClosing message (${info.settlement.stopReason}):\n\n${info.settlement.text}`);
+		} else {
+			parts.push(`\nThe child left no closing message (${info.settlement.stopReason}).`);
+		}
+		return parts.join("");
+	}
 	if (info.completionOutput && info.completionOutput.totalLines > 0) {
 		parts.push(` ${info.completionOutput.totalLines} lines of output.`);
 	}
@@ -14,8 +30,22 @@ export function buildDispatchNotification(sessionId: string, info: HeadlessCompl
 	return parts.join("");
 }
 
-export function buildResultNotification(sessionId: string, result: InteractiveShellResult): string {
+export function buildResultNotification(
+	sessionId: string,
+	result: InteractiveShellResult,
+	options: { omitClosingText?: boolean } = {},
+): string {
 	const parts = [buildResultStatusLine(sessionId, result)];
+	if (result.settlement) {
+		if (options.omitClosingText) {
+			parts.push("\nIts closing message was already delivered to you.");
+		} else if (result.settlement.text) {
+			parts.push(`\nClosing message (${result.settlement.stopReason}):\n\n${result.settlement.text}`);
+		} else {
+			parts.push(`\nThe child left no closing message (${result.settlement.stopReason}).`);
+		}
+		return parts.join("");
+	}
 	if (result.completionOutput && result.completionOutput.lines.length > 0) {
 		const truncNote = result.completionOutput.truncated
 			? ` (truncated from ${result.completionOutput.totalLines} total lines)`
@@ -23,6 +53,46 @@ export function buildResultNotification(sessionId: string, result: InteractiveSh
 		parts.push(`\nOutput (${result.completionOutput.lines.length} lines${truncNote}):\n\n${result.completionOutput.lines.join("\n")}`);
 	}
 	return parts.join("");
+}
+
+/**
+ * A turn that ended early is not a finished task. The stop reason is the only
+ * honest word for it, and a parent that reads "finished" will act on a partial
+ * answer as if it were complete.
+ */
+function endingPhrase(stopReason: string): string {
+	switch (stopReason) {
+		case "stop": return "finished its turn";
+		case "length": return "hit its output limit mid-turn";
+		case "error": return "failed mid-turn";
+		case "aborted": return "was interrupted mid-turn";
+		case "deferred": return "deferred its turn";
+		default: return `ended its turn early (${stopReason})`;
+	}
+}
+
+/**
+ * The runtime's own account of a spawned child finishing a turn. Deliberately
+ * separate from the child's text: this states what became of the child, the
+ * closing message is what the child chose to say.
+ *
+ * `continuable` must match the mode: only a child that is still alive can take
+ * follow-up work, and promising `send` to a session that is about to stop is a
+ * lie the parent will act on.
+ */
+export function buildSettlementNotice(
+	sessionId: string,
+	turn: PiSettlementResult,
+	options: { continuable?: boolean } = {},
+): string {
+	const ending = endingPhrase(turn.stopReason);
+	const headline = options.continuable === false
+		? `Subagent ${sessionId} ${ending}. This dispatch session stops now that it is done;`
+			+ ` read its output with interactive_shell({ action: "attach", sessionId: "${sessionId}" }) within five minutes.`
+		: `Subagent ${sessionId} ${ending}. It will do no further work unless you send it more:`
+			+ ` interactive_shell({ action: "send", sessionId: "${sessionId}", input: "...", submit: true })`;
+	const body = turn.text.length > 0 ? `\n\nIts closing message (${turn.stopReason}):\n\n${turn.text}` : "\n\nIt left no closing message.";
+	return `${headline}${body}`;
 }
 
 export function buildMonitorEventNotification(event: MonitorEventPayload): string {
@@ -74,6 +144,9 @@ export function buildHandsFreeUpdateMessage(update: HandsFreeUpdate): { content:
 	switch (update.status) {
 		case "exited":
 			statusLine = `Session ${update.sessionId} exited (${formatDurationMs(update.runtime)})`;
+			break;
+		case "settled":
+			statusLine = `Session ${update.sessionId} finished its turn (${formatDurationMs(update.runtime)})`;
 			break;
 		case "killed":
 			statusLine = `Session ${update.sessionId} killed (${formatDurationMs(update.runtime)})`;
@@ -137,6 +210,9 @@ export function buildIdlePromptWarning(command: string, reason: string | undefin
 
 function buildDispatchStatusLine(sessionId: string, info: HeadlessCompletionInfo, duration: string): string {
 	if (info.timedOut) return `Session ${sessionId} timed out (${duration}).`;
+	if (info.completionReason === "agent-settled") {
+		return `Session ${sessionId} ${endingPhrase(info.settlement?.stopReason ?? "stop")} (${duration}).`;
+	}
 	if (info.completionReason === "auto-close-quiet") return `Session ${sessionId} auto-closed after quiet (${duration}). This is not a terminal command verdict.`;
 	if (info.cancelled) return `Session ${sessionId} was killed (${duration}).`;
 	if (info.exitCode === 0) return `Session ${sessionId} completed successfully (${duration}).`;
@@ -145,6 +221,9 @@ function buildDispatchStatusLine(sessionId: string, info: HeadlessCompletionInfo
 
 function buildResultStatusLine(sessionId: string, result: InteractiveShellResult): string {
 	if (result.timedOut) return `Session ${sessionId} timed out.`;
+	if (result.completionReason === "agent-settled") {
+		return `Session ${sessionId} ${endingPhrase(result.settlement?.stopReason ?? "stop")}.`;
+	}
 	if (result.completionReason === "auto-close-quiet") return `Session ${sessionId} auto-closed after quiet. This is not a terminal command verdict.`;
 	if (result.cancelled) return `Session ${sessionId} was killed.`;
 	if (result.exitCode === 0) return `Session ${sessionId} completed successfully.`;

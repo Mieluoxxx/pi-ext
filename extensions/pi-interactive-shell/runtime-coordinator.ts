@@ -25,6 +25,8 @@ export class InteractiveShellCoordinator {
 	private pendingMonitorReason = new Map<string, MonitorTerminalReason>();
 	private bgWidgetCleanup: (() => void) | null = null;
 	private agentHandledCompletion = new Set<string>();
+	private settlementWatchers = new Map<string, () => void>();
+	private announcedSettlements = new Map<string, string>();
 	private extensionApi: ExtensionAPI | null = null;
 	private pendingApiTasks: Array<(pi: ExtensionAPI) => void> = [];
 	private runtimeEpoch = 0;
@@ -102,6 +104,47 @@ export class InteractiveShellCoordinator {
 		const had = this.agentHandledCompletion.has(sessionId);
 		this.agentHandledCompletion.delete(sessionId);
 		return had;
+	}
+
+	/** Keep the turn watcher for a spawned pi child; replacing one stops its predecessor. */
+	setSettlementWatcher(sessionId: string, stop: () => void): void {
+		this.stopSettlementWatcher(sessionId);
+		this.settlementWatchers.set(sessionId, stop);
+	}
+
+	stopSettlementWatcher(sessionId: string): void {
+		const stop = this.settlementWatchers.get(sessionId);
+		if (!stop) return;
+		this.settlementWatchers.delete(sessionId);
+		try {
+			stop();
+		} catch (error) {
+			console.error(`interactive-shell: settlement watcher teardown failed for ${sessionId}:`, error);
+		}
+	}
+
+	/** Remember which finished turn was already announced to the parent. */
+	markSettlementAnnounced(sessionId: string, entryId: string): void {
+		this.announcedSettlements.set(sessionId, entryId);
+	}
+
+	wasSettlementAnnounced(sessionId: string, entryId: string | undefined): boolean {
+		if (entryId === undefined) return false;
+		return this.announcedSettlements.get(sessionId) === entryId;
+	}
+
+	clearSettlementHistory(sessionId: string): void {
+		this.announcedSettlements.delete(sessionId);
+		this.stopSettlementWatcher(sessionId);
+	}
+
+	/** Drop every watcher and announcement record; used on session shutdown. */
+	disposeAllSettlementWatchers(): void {
+		for (const sessionId of [...this.settlementWatchers.keys()]) {
+			this.stopSettlementWatcher(sessionId);
+		}
+		this.settlementWatchers.clear();
+		this.announcedSettlements.clear();
 	}
 
 	setMonitor(id: string, monitor: HeadlessDispatchMonitor): void {

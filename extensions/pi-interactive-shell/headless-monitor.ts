@@ -1,7 +1,8 @@
 import { stripVTControlCharacters } from "node:util";
 import type { PtyTerminalSession } from "./pty-session.ts";
 import type { InteractiveShellConfig } from "./config.ts";
-import type { DispatchCompletionReason, MonitorEventPayload, MonitorStrategy } from "./types.ts";
+import { DEFAULT_PI_SETTLEMENT_MAX_WAIT_MS, judgeQuiet } from "./pi-settlement.ts";
+import type { DispatchCompletionReason, MonitorEventPayload, MonitorStrategy, PiSettlementResult } from "./types.ts";
 
 export interface MonitorMatchInfo {
 	strategy: MonitorStrategy;
@@ -36,6 +37,8 @@ export interface HeadlessMonitorOptions {
 	onMonitorEvent?: (event: MonitorMatchInfo) => void | Promise<void>;
 	/** Original session start time in ms since epoch, preserved when a foreground session moves headless. */
 	startedAt?: number;
+	/** Private session directory of a spawned pi child; absent when settlement is unobservable. */
+	piSessionDir?: string;
 }
 
 /** Completion payload emitted when a headless dispatch session finishes. */
@@ -48,6 +51,8 @@ export interface HeadlessCompletionInfo {
 	cancelled?: boolean;
 	/** The monitor ended an otherwise idle session after the configured quiet threshold. */
 	autoClosedOnQuiet?: boolean;
+	/** Present when the child's own session transcript reported a finished turn. */
+	settlement?: PiSettlementResult;
 	completionOutput?: {
 		lines: string[];
 		totalLines: number;
@@ -269,7 +274,17 @@ export class HeadlessDispatchMonitor {
 					this.resetQuietTimer();
 					return;
 				}
-				this.handleCompletion(null, undefined, false, true, true);
+				// A spawned pi child reports its own turn; silence alone is not a verdict.
+				const verdict = judgeQuiet(
+					this.options.piSessionDir,
+					this.startTime,
+					this.config.piSettlementMaxWait ?? DEFAULT_PI_SETTLEMENT_MAX_WAIT_MS,
+				);
+				if (verdict.wait) {
+					this.resetQuietTimer();
+					return;
+				}
+				this.handleCompletion(null, undefined, false, !verdict.settled, !verdict.settled, verdict.settled);
 			}
 		}, this.options.quietThreshold);
 	}
@@ -299,7 +314,7 @@ export class HeadlessDispatchMonitor {
 		}
 	}
 
-	private handleCompletion(exitCode: number | null, signal?: number, timedOut?: boolean, cancelled?: boolean, autoClosedOnQuiet?: boolean): void {
+	private handleCompletion(exitCode: number | null, signal?: number, timedOut?: boolean, cancelled?: boolean, autoClosedOnQuiet?: boolean, settlement?: PiSettlementResult): void {
 		if (this._disposed) return;
 		if (this.options.monitor?.strategy !== "poll-diff" && this.options.onMonitorEvent) {
 			this.processMonitorData("", true);
@@ -312,22 +327,28 @@ export class HeadlessDispatchMonitor {
 
 		if (timedOut || cancelled) {
 			this.session.kill();
+		} else if (settlement) {
+			// The child finished its turn but kept its TUI alive; stop it without claiming a crash.
+			this.session.kill();
 		}
 
 		const completionOutput = this.captureOutput();
-		const completionReason: DispatchCompletionReason = autoClosedOnQuiet
-			? "auto-close-quiet"
-			: timedOut
-				? "timed-out"
-				: cancelled
-					? "killed"
-					: "exited";
+		const completionReason: DispatchCompletionReason = settlement
+			? "agent-settled"
+			: autoClosedOnQuiet
+				? "auto-close-quiet"
+				: timedOut
+					? "timed-out"
+					: cancelled
+						? "killed"
+						: "exited";
 		const info: HeadlessCompletionInfo = {
 			exitCode,
 			signal,
 			completionReason,
 			timedOut,
 			cancelled,
+			...(settlement ? { settlement } : {}),
 			...(autoClosedOnQuiet ? { autoClosedOnQuiet: true } : {}),
 			completionOutput,
 		};
@@ -340,7 +361,12 @@ export class HeadlessDispatchMonitor {
 		this.handleCompletion(null, undefined, false, true);
 	}
 
-	handleExternalCompletion(exitCode: number | null, signal?: number, completionOutput?: HeadlessCompletionInfo["completionOutput"]): void {
+	handleExternalCompletion(
+		exitCode: number | null,
+		signal?: number,
+		completionOutput?: HeadlessCompletionInfo["completionOutput"],
+		settlement?: HeadlessCompletionInfo["settlement"],
+	): void {
 		if (this._disposed) return;
 		if (this.options.monitor?.strategy !== "poll-diff" && this.options.onMonitorEvent) {
 			this.processMonitorData("", true);
@@ -352,7 +378,14 @@ export class HeadlessDispatchMonitor {
 		this.unsubscribe();
 
 		const output = completionOutput ?? this.captureOutput();
-		const info: HeadlessCompletionInfo = { exitCode, signal, completionReason: "exited", completionOutput: output };
+		const info: HeadlessCompletionInfo = {
+			exitCode,
+			signal,
+			// A child that reported a finished turn did not merely exit with no verdict.
+			completionReason: settlement ? "agent-settled" : "exited",
+			...(settlement ? { settlement } : {}),
+			completionOutput: output,
+		};
 		this.result = info;
 		this.triggerCompleteCallbacks();
 		this.onComplete(info);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDispatchNotification, buildHandsFreeUpdateMessage, buildIdlePromptWarning, buildMonitorEventNotification, buildMonitorLifecycleNotification, buildResultNotification } from "../notification-utils.ts";
+import { buildDispatchNotification, buildHandsFreeUpdateMessage, buildIdlePromptWarning, buildMonitorEventNotification, buildMonitorLifecycleNotification, buildResultNotification, buildSettlementNotice } from "../notification-utils.ts";
 
 describe("notification utilities", () => {
 	it("formats compact dispatch notifications with a trimmed tail", () => {
@@ -127,5 +127,57 @@ describe("notification utilities", () => {
 		expect(buildIdlePromptWarning("agent --model composer-2-fast", "Review the auth flow")).toContain("reason` is UI-only");
 		expect(buildIdlePromptWarning('codex "Review the auth flow"', "Review the auth flow")).toBeNull();
 		expect(buildIdlePromptWarning('agent --model composer-2-fast "Review the auth flow"', "Review the auth flow")).toBeNull();
+	});
+
+	it("names a finished child turn as its own event, not a teardown", () => {
+		const text = buildSettlementNotice("calm-reef", {
+			text: "No blocking issues.\nShip it.",
+			stopReason: "stop",
+			entryId: "e7",
+		});
+		expect(text).toContain("Subagent calm-reef finished its turn.");
+		expect(text).toContain("unless you send it more");
+		expect(text).toContain('action: "send"');
+		expect(text).toContain("Its closing message (stop):");
+		expect(text).toContain("No blocking issues.\nShip it.");
+		expect(text).not.toContain("killed");
+		expect(text).not.toContain("auto-closed");
+
+		const silent = buildSettlementNotice("calm-reef", { text: "", stopReason: "length", entryId: "e8" });
+		expect(silent).toContain("It left no closing message.");
+	});
+
+	it("does not promise follow-up work to a dispatch child that is about to stop", () => {
+		const text = buildSettlementNotice(
+			"calm-reef",
+			{ text: "done", stopReason: "stop", entryId: "e1" },
+			{ continuable: false },
+		);
+		expect(text).toContain("This dispatch session stops now that it is done");
+		expect(text).toContain('action: "attach"');
+		expect(text).not.toContain('action: "send"');
+		expect(text).not.toContain("unless you send it more");
+	});
+
+	it("does not repeat a closing message that was already delivered", () => {
+		const settlement = { text: "the answer", stopReason: "stop", entryId: "e1" };
+		const dispatch = buildDispatchNotification("calm-reef", {
+			exitCode: null,
+			completionReason: "agent-settled",
+			settlement,
+		}, "12s", { omitClosingText: true });
+		expect(dispatch).toContain("Session calm-reef finished its turn (12s).");
+		expect(dispatch).toContain("Its closing message was already delivered to you.");
+		expect(dispatch).not.toContain("the answer");
+
+		const result = buildResultNotification("calm-reef", {
+			exitCode: null,
+			completionReason: "agent-settled",
+			cancelled: false,
+			backgrounded: false,
+			settlement,
+		}, { omitClosingText: true });
+		expect(result).toContain("Its closing message was already delivered to you.");
+		expect(result).not.toContain("the answer");
 	});
 });

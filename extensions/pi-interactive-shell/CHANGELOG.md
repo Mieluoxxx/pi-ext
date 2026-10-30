@@ -2,6 +2,12 @@
 
 All notable changes to the `pi-interactive-shell` extension will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- Announce each finished turn of a spawned `pi` child to the parent as an `interactive-shell-settled` notice carrying the child's closing message. The notice fires when the turn ends, before any quiet timeout, and each turn is announced once. In `hands-free` the child stays alive, so `action: "send"` starts another turn; a `dispatch` child stops shortly after its turn settles and the notice points at `attach` instead of offering follow-up work it cannot accept.
+- A `spawn` of `pi` in `dispatch` or `hands-free` now gets a private `--session-dir`/`--session-id`, so its own session transcript is readable while it runs. A quiet session stops as `agent-settled` instead of guessing from terminal silence; a child that is still mid-turn keeps waiting, bounded by the new `piSettlementMaxWait` (default 30 minutes). Other agents, plain commands, and pi runs whose session cannot be read keep `auto-close-quiet` unchanged.
+
 ## [0.16.3] - 2026-10-30
 
 ### Fixed

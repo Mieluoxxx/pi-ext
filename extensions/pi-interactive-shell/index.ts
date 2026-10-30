@@ -16,9 +16,10 @@ import type {
 	MonitorTriggerConfig,
 } from "./types.ts";
 import { sessionManager, generateSessionId, releaseSessionManagerSingleton } from "./session-manager.ts";
+import type { ActiveSession, BackgroundSession } from "./session-manager.ts";
 import { loadConfig } from "./config.ts";
 import type { InteractiveShellConfig } from "./config.ts";
-import { parseSpawnArgs, resolveSpawn, type SpawnRequest } from "./spawn.ts";
+import { createPiSessionRun, parseSpawnArgs, removePiSessionRun, resolveSpawn, type PiSessionRun, type SpawnRequest } from "./spawn.ts";
 import { translateInput, type InputSpec } from "./key-encoding.ts";
 import {
 	ENABLE_TOOL_DESCRIPTION,
@@ -39,8 +40,9 @@ import type {
 	MonitorTriggerMatcher,
 } from "./headless-monitor.ts";
 import { setupBackgroundWidget } from "./background-widget.ts";
-import { buildDispatchNotification, buildHandsFreeUpdateMessage, buildMonitorEventNotification, buildMonitorLifecycleNotification, buildResultNotification, summarizeInteractiveResult } from "./notification-utils.ts";
-import { createSessionQueryState, getSessionOutput } from "./session-query.ts";
+import { buildDispatchNotification, buildHandsFreeUpdateMessage, buildMonitorEventNotification, buildMonitorLifecycleNotification, buildResultNotification, buildSettlementNotice, summarizeInteractiveResult } from "./notification-utils.ts";
+import { watchPiSettlement } from "./pi-settlement-watcher.ts";
+import { createSessionQueryState, getSessionOutput, type SessionQueryState } from "./session-query.ts";
 import { InteractiveShellCoordinator } from "./runtime-coordinator.ts";
 import { spawn as spawnChildProcess } from "node:child_process";
 import { resolvePiShell, type ResolvedShellConfig } from "./shell-resolution.ts";
@@ -105,7 +107,9 @@ function makeMonitorCompletionCallback(
 		const wasAgentHandled = coordinator.consumeAgentHandledCompletion(id);
 		if (!wasAgentHandled) {
 			const duration = formatDuration(Date.now() - startTime);
-			const content = buildDispatchNotification(id, info, duration);
+			const content = buildDispatchNotification(id, info, duration, {
+				omitClosingText: coordinator.wasSettlementAnnounced(id, info.settlement?.entryId),
+			});
 			coordinator.runWithExtensionApi((activePi) => {
 				activePi.sendMessage({
 					customType: "interactive-shell-transfer",
@@ -121,6 +125,62 @@ function makeMonitorCompletionCallback(
 		scheduleMonitorHistoryCleanup(id);
 		sessionManager.scheduleCleanup(id, 5 * 60 * 1000);
 	};
+}
+
+/**
+ * Announce each finished turn of a spawned pi child to the parent.
+ *
+ * The child stays alive after answering, so this notice is what tells the
+ * parent its task is done and follow-up work is possible. Teardown is a
+ * separate concern handled by the quiet/settlement path.
+ */
+/**
+ * Whether a spawned child outlives its turn. Quiet auto-close is on by default
+ * for dispatch and off for hands-free, so the mode alone is not the answer.
+ */
+function childStaysAlive(mode: string, handsFree: ToolParams["handsFree"]): boolean {
+	const autoExitOnQuiet = mode === "dispatch"
+		? handsFree?.autoExitOnQuiet !== false
+		: handsFree?.autoExitOnQuiet === true;
+	return !autoExitOnQuiet;
+}
+
+function startSettlementWatch(sessionId: string, sessionDir: string | undefined, continuable: boolean): void {
+	if (!sessionDir) return;
+	// The overlay registers its active session just after construction, so a first
+	// minute without one is startup, not death.
+	let everSeen = false;
+	const alive = (): boolean => {
+		const active = sessionManager.getActive(sessionId);
+		if (!active) return !everSeen;
+		everSeen = true;
+		// `killed`, `exited`, and `backgrounded` are not running children: a killed
+		// session must not have a watcher polling every second for the rest of the run.
+		const status = active.getStatus();
+		return status === "running" || status === "monitoring" || status === "user-takeover";
+	};
+	coordinator.setSettlementWatcher(sessionId, watchPiSettlement({
+		sessionDir,
+		// The watcher outlives the terminal monitor: a child that answered is still
+		// alive and may be given more work. Its own death ends the watch.
+		isAlive: () => {
+			if (alive()) return true;
+			coordinator.clearSettlementHistory(sessionId);
+			return false;
+		},
+		onSettled: (turn) => {
+			coordinator.markSettlementAnnounced(sessionId, turn.entryId);
+			coordinator.runWithExtensionApi((activePi) => {
+				activePi.sendMessage({
+					customType: "interactive-shell-settled",
+					content: buildSettlementNotice(sessionId, turn, { continuable }),
+					display: true,
+					details: { sessionId, settlement: turn },
+				}, { triggerTurn: true });
+				activePi.events.emit("interactive-shell:settled", { sessionId, settlement: turn });
+			});
+		},
+	}));
 }
 
 function resolveMonitorTerminalReason(info: HeadlessCompletionInfo, override?: MonitorTerminalReason): MonitorTerminalReason {
@@ -600,6 +660,66 @@ function describeInput(input: InputSpec | undefined): string {
 	return parts.join(" + ") || "(empty)";
 }
 
+/**
+ * Query bookkeeping for background sessions, keyed by their table entry so the
+ * rate limit and the incremental cursor survive across tool calls.
+ */
+const backgroundQueryStates = new WeakMap<BackgroundSession, SessionQueryState>();
+
+/**
+ * A backgrounded session has no ActiveSession entry while no overlay or monitor
+ * owns it, but `action: "list"` still reports it as running. Present that entry
+ * through the ActiveSession interface so every action reaches it without moving
+ * it between the two tables.
+ */
+function backgroundSessionTarget(entry: BackgroundSession, config: InteractiveShellConfig): ActiveSession {
+	let queryState = backgroundQueryStates.get(entry);
+	if (!queryState) {
+		queryState = createSessionQueryState();
+		backgroundQueryStates.set(entry, queryState);
+	}
+	const id = entry.id;
+	return {
+		id,
+		command: entry.command,
+		reason: entry.reason,
+		write: (data) => entry.session.write(data),
+		kill: () => entry.session.kill(),
+		background: () => {},
+		getOutput: (options) => getSessionOutput(entry.session, config, queryState, options),
+		getStatus: () => (entry.session.exited ? "exited" : "running"),
+		getRuntime: () => Date.now() - entry.startedAt.getTime(),
+		getResult: () => (entry.session.exited
+			? { exitCode: entry.session.exitCode, signal: entry.session.signal, backgrounded: true }
+			: undefined),
+		// The background table owns this entry's lifecycle: removing it clears the
+		// watcher, disposes the PTY exactly once, and releases the id.
+		dispose: () => {
+			coordinator.disposeMonitor(id);
+			scheduleMonitorHistoryCleanup(id);
+			sessionManager.remove(id);
+		},
+		// A completed background session stays in the table for `list`, `dismiss`, and
+		// its own cleanup timer; the query path must not tear that down.
+		retainAfterCompletion: true,
+		// ponytail: one exit listener per rate-limited query wait; a session that exits
+		// reports its result instead of waiting.
+		onComplete: (callback) => { entry.session.addExitListener(callback); },
+	};
+}
+
+function resolveSessionTarget(
+	id: string,
+	config: () => InteractiveShellConfig,
+): { session: ActiveSession; background: boolean } | undefined {
+	const active = sessionManager.getActive(id);
+	if (active) return { session: active, background: false };
+	// Read the background table through list(): get() suspends its auto-cleanup.
+	const entry = sessionManager.list().find((candidate) => candidate.id === id);
+	if (!entry) return undefined;
+	return { session: backgroundSessionTarget(entry, config()), background: true };
+}
+
 function registerHeadlessActive(
 	id: string,
 	command: string,
@@ -883,9 +1003,26 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 		let spawnWorktreePath: string | undefined;
 		let spawnAgent: string | undefined;
 		let spawnMode: string | undefined;
+		let spawnPiSessionDir: string | undefined;
+		// Own a spawned pi child's session layout only where a quiet auto-close could guess wrong;
+		// an interactive spawn keeps the user's normal session location.
+		let piSession: PiSessionRun | undefined;
+		// The policy must see the command that will actually run, and the preview must
+		// produce that same command, so the private session directory is reserved first
+		// and removed again if the policy refuses the launch.
+		if ((effectiveMode === "dispatch" || effectiveMode === "hands-free")
+			&& spawn
+			&& (spawn.agent ?? config.spawn.defaultAgent) === "pi") {
+			piSession = createPiSessionRun();
+		}
+		const discardPiSession = (): void => {
+			if (piSession) removePiSessionRun(piSession);
+			piSession = undefined;
+		};
 		if (spawn) {
-			const preview = resolveSpawn(config, effectiveCwd, spawn, () => ctx.sessionManager.getSessionFile(), { createWorktree: false });
+			const preview = resolveSpawn(config, effectiveCwd, spawn, () => ctx.sessionManager.getSessionFile(), { createWorktree: false, piSession });
 			if (!preview.ok) {
+				discardPiSession();
 				return {
 					content: [{ type: "text", text: preview.error }],
 					isError: true,
@@ -896,16 +1033,20 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 		let launchAuthorized = false;
 		if (effectiveCommand) {
 			const authorization = await authorizeLaunchCommand(config, effectiveCommand, ctx);
-			if (!authorization.allowed) return {
-				content: [{ type: "text", text: "Launch blocked by the global interactive-shell command policy." }],
-				isError: true,
-				details: { error: "launch_not_authorized", reason: authorization.reason },
-			};
+			if (!authorization.allowed) {
+				discardPiSession();
+				return {
+					content: [{ type: "text", text: "Launch blocked by the global interactive-shell command policy." }],
+					isError: true,
+					details: { error: "launch_not_authorized", reason: authorization.reason },
+				};
+			}
 			launchAuthorized = true;
 		}
 		if (spawn) {
-			const resolvedSpawn = resolveSpawn(config, effectiveCwd, spawn, () => ctx.sessionManager.getSessionFile());
+			const resolvedSpawn = resolveSpawn(config, effectiveCwd, spawn, () => ctx.sessionManager.getSessionFile(), { piSession });
 			if (!resolvedSpawn.ok) {
+				discardPiSession();
 				return {
 					content: [{ type: "text", text: resolvedSpawn.error }],
 					isError: true,
@@ -919,6 +1060,7 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 			spawnWorktreePath = resolvedSpawn.spawn.worktreePath;
 			spawnAgent = resolvedSpawn.spawn.agent;
 			spawnMode = resolvedSpawn.spawn.mode;
+			spawnPiSessionDir = resolvedSpawn.spawn.piSessionDir;
 		}
 		if (monitorValidation?.ok) {
 			const compiled = monitorValidation.compiled;
@@ -967,6 +1109,7 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 				}, makeStructuredMonitorCompletionCallback(id));
 				registerHeadlessActive(id, sessionCommand, effectiveReason, session, monitorRunner, startTime, config, "monitoring");
 			} catch (error) {
+				if (piSession) removePiSessionRun(piSession);
 				failHeadlessStart(id, session, error, spawnWorktreePath);
 			}
 
@@ -992,16 +1135,19 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 					{ command: launchCommand, shellConfig, cwd: effectiveCwd, cols: 120, rows: 40, scrollback: config.scrollbackLines },
 				);
 				const startTime = Date.now();
-				sessionManager.add(launchCommand, session, name, effectiveReason, { id, noAutoCleanup: true, startedAt: new Date(startTime) });
+				sessionManager.add(launchCommand, session, name, effectiveReason, { id, noAutoCleanup: true, startedAt: new Date(startTime), piSessionDir: spawnPiSessionDir });
 				const monitor = new HeadlessDispatchMonitor(session, config, {
 					autoExitOnQuiet: handsFree?.autoExitOnQuiet !== false,
 					quietThreshold: handsFree?.quietThreshold ?? config.handsFreeQuietThreshold,
 					gracePeriod: handsFree?.gracePeriod ?? config.autoExitGracePeriod,
 					timeout,
 					startedAt: startTime,
+					piSessionDir: spawnPiSessionDir,
 				}, makeMonitorCompletionCallback(id, startTime));
 				registerHeadlessActive(id, launchCommand, effectiveReason, session, monitor, startTime, config);
+				startSettlementWatch(id, spawnPiSessionDir, childStaysAlive("dispatch", handsFree));
 			} catch (error) {
+				if (piSession) removePiSessionRun(piSession);
 				failHeadlessStart(id, session, error, spawnWorktreePath);
 			}
 
@@ -1034,6 +1180,7 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 							reason: effectiveReason,
 							mode: effectiveMode,
 							sessionId: generatedSessionId,
+							piSessionDir: spawnPiSessionDir,
 							startedAt: overlayStartTime,
 							handsFreeUpdateMode: handsFree?.updateMode,
 							handsFreeUpdateInterval: handsFree?.updateInterval,
@@ -1072,10 +1219,12 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 				handsFree,
 				overlayStartTime,
 			});
+			// Only a child that stays alive after its turn can take follow-up work.
+			startSettlementWatch(generatedSessionId, spawnPiSessionDir, childStaysAlive(effectiveMode, handsFree));
 
 			if (effectiveMode === "dispatch") {
 				return {
-					content: [{ type: "text", text: appendWorktreeNotice(`Session dispatched (id: ${generatedSessionId}).\nYou'll be notified when it completes.\nYou can still query with interactive_shell({ action: "query", sessionId: "${generatedSessionId}" }) if needed.`, spawnWorktreePath) }],
+					content: [{ type: "text", text: appendWorktreeNotice(`Session dispatched (id: ${generatedSessionId}).\nYou'll be notified when it completes.\nQuery while it runs with interactive_shell({ action: "query", sessionId: "${generatedSessionId}" }); after it settles, use action: "attach" for the full transcript.`, spawnWorktreePath) }],
 					details: { sessionId: generatedSessionId, status: "running", command: launchCommand, reason: effectiveReason, mode: effectiveMode, spawnAgent, spawnMode, spawnWorktreePath },
 				};
 			}
@@ -1109,6 +1258,7 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 						reason: effectiveReason,
 						mode,
 						sessionId: generatedSessionId,
+						piSessionDir: spawnPiSessionDir,
 						handsFreeUpdateMode: handsFree?.updateMode,
 						handsFreeUpdateInterval: handsFree?.updateInterval,
 						handsFreeQuietThreshold: handsFree?.quietThreshold,
@@ -1130,6 +1280,9 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 										break;
 									case "exited":
 										statusText = `Session ${update.sessionId} exited`;
+										break;
+									case "settled":
+										statusText = `Session ${update.sessionId} finished its turn`;
 										break;
 									case "killed":
 										statusText = `Session ${update.sessionId} killed`;
@@ -1230,6 +1383,8 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 		if (event.reason === "reload") return;
 		sessionManager.killAll();
 		coordinator.disposeAllMonitors();
+		// Watchers hold unref timers that would otherwise keep polling into a dead runtime.
+		coordinator.disposeAllSettlementWatchers();
 		coordinator.clearPendingApiTasks();
 		releaseSessionManagerSingleton(sessionManager);
 		Reflect.deleteProperty(runtimeGlobal, COORDINATOR_KEY);
@@ -1427,12 +1582,23 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 
 			// ── Branch 1: Interact with existing session ──
 			if (sessionId && ["query", "send", "configure", "kill", "background"].includes(action)) {
-				const session = sessionManager.getActive(sessionId);
-				if (!session) {
+				const resolveTarget = () => resolveSessionTarget(sessionId, () => loadRuntimeConfig(cwd ?? ctx.cwd));
+				const target = resolveTarget();
+				if (!target) {
 					return {
-						content: [{ type: "text", text: `Session not found or no longer active: ${sessionId}` }],
+						content: [{ type: "text", text: `Session not found: ${sessionId}. No active or background session has that id; use interactive_shell({ action: "list" }) to see the sessions that exist.` }],
 						isError: true,
 						details: { sessionId, error: "session_not_found" },
+					};
+				}
+				const session = target.session;
+
+				// Already backgrounded: there is no overlay to dismiss.
+				if (action === "background" && target.background) {
+					const status = session.getStatus();
+					return {
+						content: [{ type: "text", text: `Session ${sessionId} is already in the background (${status}).` }],
+						details: { sessionId, backgroundId: sessionId, status },
 					};
 				}
 
@@ -1513,7 +1679,14 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 				if (action === "send") {
 					const translatedInput = effectiveInput !== undefined ? translateInput(effectiveInput) : "";
 					const finalInput = submit ? `${translatedInput}\r` : translatedInput;
-					const success = sessionManager.writeToActive(sessionId, finalInput);
+					// Background sessions are not in the active table, so write through the resolved target.
+					let success: boolean;
+					if (target.background) {
+						session.write(finalInput);
+						success = true;
+					} else {
+						success = sessionManager.writeToActive(sessionId, finalInput);
+					}
 					if (!success) {
 						return {
 							content: [{ type: "text", text: `Failed to send input to session: ${sessionId}` }],
@@ -1558,7 +1731,7 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 						]);
 
 						if (completedEarly) {
-							const earlySession = sessionManager.getActive(sessionId);
+							const earlySession = resolveTarget()?.session;
 							if (!earlySession) {
 								return { content: [{ type: "text", text: `Session ${sessionId} ended` }], details: { sessionId, status: "ended" } };
 							}
@@ -1697,6 +1870,7 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 									? handsFree?.autoExitOnQuiet !== false
 									: handsFree?.autoExitOnQuiet === true,
 								autoExitGracePeriod: handsFree?.gracePeriod ?? config.autoExitGracePeriod,
+								piSessionDir: bgSession.piSessionDir,
 								onUnfocus: () => coordinator.unfocusOverlay(),
 								onHandsFreeUpdate: mode === "hands-free"
 									? makeNonBlockingUpdateHandler()
@@ -1718,6 +1892,10 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 				}
 
 				if (isNonBlocking) {
+					// A backgrounded hands-free child loses its watcher when it unregisters its
+					// active session, so reattaching is when it gets one back. The watcher's
+					// baseline read skips the answer it already delivered.
+					startSettlementWatch(reattachSessionId, bgSession.piSessionDir, childStaysAlive(mode!, handsFree));
 					setupDispatchCompletion(overlayPromise, config, {
 						id: reattachSessionId,
 						mode: mode!,
@@ -1747,7 +1925,7 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 				}
 				if (monitor && !monitor.disposed) {
 					if (!result.backgrounded) {
-						monitor.handleExternalCompletion(result.exitCode, result.signal, result.completionOutput);
+						monitor.handleExternalCompletion(result.exitCode, result.signal, result.completionOutput, result.settlement);
 						coordinator.deleteMonitor(attach);
 					} else {
 						const monitoredId = result.backgroundId ?? attach;
@@ -1938,7 +2116,7 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 						if (result.transferred) {
 							coordinator.markAgentHandledCompletion(targetId);
 						}
-						monitor.handleExternalCompletion(result.exitCode, result.signal, result.completionOutput);
+						monitor.handleExternalCompletion(result.exitCode, result.signal, result.completionOutput, result.settlement);
 						coordinator.deleteMonitor(targetId);
 					}
 				} else if (result.backgrounded) {
@@ -2071,6 +2249,7 @@ function setupDispatchCompletion(
 				gracePeriod: ctx.handsFree?.gracePeriod ?? config.autoExitGracePeriod,
 				timeout: remainingTimeout,
 				startedAt: bgStartTime,
+				piSessionDir: bgSession.piSessionDir,
 			}, makeMonitorCompletionCallback(bgId, bgStartTime));
 			registerHeadlessActive(bgId, command, reason, bgSession.session, monitor, bgStartTime, config);
 			return;
@@ -2079,7 +2258,9 @@ function setupDispatchCompletion(
 		if (mode === "dispatch") {
 			coordinator.runWithExtensionApi((activePi) => {
 				if (!wasAgentInitiated) {
-					const content = buildResultNotification(id, result);
+					const content = buildResultNotification(id, result, {
+						omitClosingText: coordinator.wasSettlementAnnounced(id, result.settlement?.entryId),
+					});
 					activePi.sendMessage({
 						customType: "interactive-shell-transfer",
 						content,

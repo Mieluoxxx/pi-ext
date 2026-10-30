@@ -143,6 +143,13 @@ describe("config + docs parity", () => {
 		expect(readme).toContain("Alt+Shift+P");
 		expect(readme).toContain(`"handsFreeQuietThreshold": ${defaults.handsFreeQuietThreshold}`);
 		expect(readme).toContain(`"autoExitGracePeriod": ${defaults.autoExitGracePeriod}`);
+		expect(readme).toContain(`"piSettlementMaxWait": ${defaults.piSettlementMaxWait}`);
+		expect(defaults.piSettlementMaxWait).toBe(30 * 60 * 1000);
+		expect(skill).toContain("reports real turns");
+		expect(skill).toContain("Only `hands-free` keeps the child alive");
+		expect(toolSchema).toContain("so its finished turn is reported instead of inferred from silence");
+		expect(readme).toContain("so its own transcript is readable while it runs");
+		expect(readme).toContain("interactive-shell-settled");
 		expect(readme).toContain(`Dispatch defaults \`autoExitOnQuiet: true\` — the session gets a 15s startup grace period`);
 		expect(readme).toContain("The completion notification identifies this as a quiet auto-close, not a user kill.");
 		expect(skill).toContain("enable_interactive_shell");

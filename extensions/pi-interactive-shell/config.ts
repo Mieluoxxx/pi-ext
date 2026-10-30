@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import type { KeyId, OverlayAnchor } from "@earendil-works/pi-tui";
 import { compileLaunchPolicy, type LaunchPolicy } from "./launch-policy.ts";
+import { DEFAULT_PI_SETTLEMENT_MAX_WAIT_MS } from "./pi-settlement.ts";
 
 /** A spawn agent is any key configured in `spawn.commands`, including the built-in defaults. */
 export type SpawnAgent = string;
@@ -45,6 +46,11 @@ export interface InteractiveShellConfig {
 	minQueryIntervalSeconds: number;
 	/** Present only when the user's global config defines `launchPolicy`. */
 	launchPolicy?: LaunchPolicy;
+	/**
+	 * Hard cap on how long a mid-turn pi child may outlast the quiet threshold.
+	 * Optional so config literals stay valid; `loadConfig` always fills it in.
+	 */
+	piSettlementMaxWait?: number;
 }
 
 const DEFAULT_SPAWN_CONFIG: SpawnConfig = {
@@ -92,6 +98,7 @@ const DEFAULT_CONFIG: InteractiveShellConfig = {
 	handsFreeUpdateMaxChars: 1500,
 	handsFreeMaxTotalChars: 100000,
 	minQueryIntervalSeconds: 60,
+	piSettlementMaxWait: DEFAULT_PI_SETTLEMENT_MAX_WAIT_MS,
 };
 
 export function loadConfig(cwd: string): InteractiveShellConfig {
@@ -171,6 +178,12 @@ export function loadConfig(cwd: string): InteractiveShellConfig {
 			DEFAULT_CONFIG.minQueryIntervalSeconds,
 			5,
 			300,
+		),
+		piSettlementMaxWait: clampInt(
+			merged.piSettlementMaxWait,
+			DEFAULT_PI_SETTLEMENT_MAX_WAIT_MS,
+			60_000,
+			24 * 60 * 60 * 1000,
 		),
 		launchPolicy: resolveLaunchPolicy(globalConfig, projectConfig),
 	};

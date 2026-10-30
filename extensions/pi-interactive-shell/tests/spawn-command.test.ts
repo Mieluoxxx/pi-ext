@@ -278,7 +278,7 @@ describe("/spawn command, shortcut, and tool spawn", () => {
 		await expect(tool!.execute("call-1", {
 			sessionId: "missing-session",
 			spawn: {},
-		}, undefined, undefined, harness.ctx as any)).rejects.toThrow("Session not found or no longer active: missing-session");
+		}, undefined, undefined, harness.ctx as any)).rejects.toThrow(/Session not found: missing-session[\s\S]*action: "list"/);
 	});
 
 	it("interactive_shell rejects non-empty spawn requests for existing sessions", async () => {

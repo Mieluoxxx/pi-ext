@@ -17,6 +17,7 @@ import {
 } from "./types.ts";
 import { captureCompletionOutput, captureTransferOutput, maybeBuildHandoffPreview, maybeWriteHandoffSnapshot } from "./handoff-utils.ts";
 import { createSessionQueryState, getSessionOutput } from "./session-query.ts";
+import { DEFAULT_PI_SETTLEMENT_MAX_WAIT_MS, judgeQuiet, readPiSettlement } from "./pi-settlement.ts";
 
 export class InteractiveShellOverlay implements Component, Focusable {
 	focused = false;
@@ -54,6 +55,9 @@ export class InteractiveShellOverlay implements Component, Focusable {
 	private updateMode: "on-quiet" | "interval";
 	private quietTimer: ReturnType<typeof setTimeout> | null = null;
 	private hasUnsentData = false;
+	/** Private session directory of a spawned pi child; absent when settlement is unobservable. */
+	private piSessionDir: string | undefined;
+	private settlementMaxWait: number;
 	// Non-blocking mode: track status for agent queries
 	private completionResult: InteractiveShellResult | undefined;
 	private queryState = createSessionQueryState();
@@ -75,6 +79,8 @@ export class InteractiveShellOverlay implements Component, Focusable {
 		this.config = config;
 		this.done = done;
 		this.startTime = options.startedAt ?? Date.now();
+		this.piSessionDir = options.piSessionDir;
+		this.settlementMaxWait = config.piSettlementMaxWait ?? DEFAULT_PI_SETTLEMENT_MAX_WAIT_MS;
 
 		const overlayWidth = Math.floor((tui.terminal.columns * this.config.overlayWidthPercent) / 100);
 		const overlayHeight = Math.floor((tui.terminal.rows * this.config.overlayHeightPercent) / 100);
@@ -354,16 +360,21 @@ export class InteractiveShellOverlay implements Component, Focusable {
 						this.resetQuietTimer();
 						return;
 					}
+					// A spawned pi child reports its own turn; silence alone is not a verdict.
+					const verdict = judgeQuiet(this.piSessionDir, this.startTime, this.settlementMaxWait);
+					if (verdict.wait) {
+						this.resetQuietTimer();
+						return;
+					}
 					// Emit final update with any pending output
 					if (this.hasUnsentData) {
 						this.emitHandsFreeUpdate();
 						this.hasUnsentData = false;
 					}
 					// Send completion notification and auto-close.
-					// This is a quiet auto-close, not a command completion verdict.
 					if (this.options.onHandsFreeUpdate && this.sessionId) {
 						this.options.onHandsFreeUpdate({
-							status: "killed",
+							status: verdict.settled ? "settled" : "killed",
 							sessionId: this.sessionId,
 							runtime: Date.now() - this.startTime,
 							tail: [],
@@ -372,7 +383,10 @@ export class InteractiveShellOverlay implements Component, Focusable {
 							budgetExhausted: this.budgetExhausted,
 						});
 					}
-					this.finishWithKill("auto-close-quiet");
+					// A settled child is a finished turn. A quiet auto-close is the heuristic,
+					// not a command completion verdict.
+					if (verdict.settled) this.finishWithSettled(verdict.settled);
+					else this.finishWithKill("auto-close-quiet");
 					return;
 				}
 				// Normal behavior: just emit update
@@ -641,9 +655,16 @@ export class InteractiveShellOverlay implements Component, Focusable {
 		const handoffPreview = this.maybeBuildHandoffPreview("exit");
 		const handoff = this.maybeWriteHandoffSnapshot("exit");
 		const completionOutput = this.captureCompletionOutput();
+		// A child that reported its turn is not an unexplained exit, and carrying the
+		// entry id lets the caller skip a closing message the watcher already sent.
+		const turn = this.piSessionDir ? readPiSettlement(this.piSessionDir) : undefined;
+		const settlement = turn?.state === "settled"
+			? { text: turn.text, stopReason: turn.stopReason, entryId: turn.entryId }
+			: undefined;
 		const result: InteractiveShellResult = {
 			exitCode: this.session.exitCode,
 			signal: this.session.signal,
+			...(settlement ? { completionReason: "agent-settled" as const, settlement } : {}),
 			backgrounded: false,
 			cancelled: false,
 			sessionId: this.sessionId ?? undefined,
@@ -681,7 +702,7 @@ export class InteractiveShellOverlay implements Component, Focusable {
 		const handoffPreview = this.maybeBuildHandoffPreview("detach");
 		const handoff = this.maybeWriteHandoffSnapshot("detach");
 		const addOptions = this.sessionId
-			? { id: this.sessionId, noAutoCleanup: this.options.mode === "dispatch", startedAt: new Date(this.startTime) }
+			? { id: this.sessionId, noAutoCleanup: this.options.mode === "dispatch", startedAt: new Date(this.startTime), piSessionDir: this.piSessionDir }
 			: undefined;
 		const id = sessionManager.add(this.options.command, this.session, this.options.name, this.options.reason, addOptions);
 		const result: InteractiveShellResult = {
@@ -706,7 +727,7 @@ export class InteractiveShellOverlay implements Component, Focusable {
 		this.done(result);
 	}
 
-	private finishWithKill(completionReason: InteractiveShellResult["completionReason"] = "killed"): void {
+	private finishWithKill(completionReason: InteractiveShellResult["completionReason"] = "killed", settlement?: InteractiveShellResult["settlement"]): void {
 		if (this.finished) return;
 		this.finished = true;
 		this.stopCountdown();
@@ -720,8 +741,10 @@ export class InteractiveShellOverlay implements Component, Focusable {
 		const result: InteractiveShellResult = {
 			exitCode: null,
 			completionReason,
+			...(settlement ? { settlement } : {}),
 			backgrounded: false,
-			cancelled: true,
+			// A settled turn was not cancelled by anyone; the idle TUI is what stops.
+			cancelled: !settlement,
 			sessionId: this.sessionId ?? undefined,
 			userTookOver: this.userTookOver,
 			completionOutput,
@@ -741,6 +764,11 @@ export class InteractiveShellOverlay implements Component, Focusable {
 		}
 
 		this.done(result);
+	}
+
+	/** The child reported a finished turn; stop the idle TUI and keep its closing answer. */
+	private finishWithSettled(settlement: NonNullable<InteractiveShellResult["settlement"]>): void {
+		this.finishWithKill("agent-settled", settlement);
 	}
 
 	private finishWithTransfer(): void {
