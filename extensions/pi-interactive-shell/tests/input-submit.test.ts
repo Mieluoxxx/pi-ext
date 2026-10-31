@@ -112,11 +112,22 @@ describe("interactive_shell submit input helper", () => {
 		const harness = await setupHarness();
 		expect(harness.tool).toBeTruthy();
 		expect((harness.tool as any).promptSnippet).toContain("submit=true");
-		expect((harness.tool as any).promptSnippet).toContain("existing session");
-		expect((harness.tool as any).promptSnippet).toContain("explicit action");
-		expect((harness.tool as any).promptSnippet).toContain("Validation errors perform no operation");
-		expect((harness.tool as any).description).toContain("monitor_status: sessionId");
-		expect((harness.tool as any).description).toContain("fileWatch instead of command/spawn");
+	});
+
+	// The description is paid for on every request, so it carries only what the
+	// schema cannot express. A hand-maintained action list drifts from the enum
+	// (it listed nine actions while twelve existed) and restates parameter
+	// descriptions, so its absence is the assertion.
+	it("keeps the tool description free of a hand-maintained action list", async () => {
+		const harness = await setupHarness();
+		const description: string = (harness.tool as any).description;
+		expect(description).not.toMatch(/^- (start|query|send|configure|kill|background|attach|list|dismiss):/m);
+		expect(description).toContain("A validation error performs no operation");
+		expect(description).toContain("the file-watch strategy may omit");
+		expect(description).toContain("reports its finished turn rather than having it inferred from silence");
+		// The submit affordance itself stays documented where it belongs: on the field.
+		const { toolParameters } = await import("../tool-schema.ts");
+		expect((toolParameters as any).properties.submit.description).toContain("submit:true alone sends Enter");
 	});
 
 	it("appends Enter after plain text input when submit=true", async () => {

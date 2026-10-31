@@ -8,40 +8,27 @@ export const ENABLE_TOOL_LABEL = "Enable Interactive Shell";
 export const ENABLE_TOOL_DESCRIPTION = "Enable interactive_shell for interactive CLIs, user-authorized coding agents, and process monitors. It becomes callable on the next turn.";
 export const enableToolParameters = Type.Object({});
 
-export const TOOL_DESCRIPTION = `Run interactive CLIs, supervise user-authorized coding agents, and monitor processes. Use bash for ordinary commands.
+export const TOOL_DESCRIPTION = `Run interactive CLIs, supervise coding agents, and watch processes. Use bash for ordinary commands.
 
-Choose exactly one action. Supply only its parameters; omit unused optional fields, or use null under strict structured sampling. Never invent empty strings, zeroes, false, or placeholder objects to fill the schema.
-- start: command OR spawn; optional mode (interactive, hands-free, dispatch, monitor), cwd, name, reason, background, handsFree, handoffPreview, handoffSnapshot, timeout. mode=monitor requires monitor. A file-watch monitor uses fileWatch instead of command/spawn.
-- query: sessionId and optional outputLines/outputMaxChars/outputOffset/drain/incremental. Read-only.
-- send: sessionId and input/inputKeys/inputHex/inputPaste/submit. Raw input only types text; submit=true appends Enter. inputPaste uses bracketed paste.
-- configure: sessionId and non-empty settings.
-- kill: sessionId and optional output query parameters; returns final output.
-- background: sessionId; dismisses the overlay without stopping the process.
-- attach: sessionId and optional mode (not monitor), cwd, reason, handsFree, handoffPreview, handoffSnapshot, timeout.
-- list: no other parameters.
-- dismiss: sessionId OR all=true. Never dismiss unrelated sessions.
-- monitor_status: sessionId.
-- monitor_events: sessionId and optional monitorEventLimit/monitorEventOffset/monitorSinceEventId/monitorTriggerId.
+Pass one \`action\` with only its own parameters. Omit unused fields (or send null under strict sampling); never send empty-string, zero, or false placeholders. A validation error performs no operation, so rebuild the call instead of retrying it unchanged. Clean up only the sessions this task created.
 
-Minimal examples:
+What the schema cannot show:
+- start takes \`command\` XOR \`spawn\`. A monitor requires \`monitor\`; the file-watch strategy may omit \`command\`. \`background: true\` is start-only and only meaningful for dispatch and monitor.
+- attach accepts a \`mode\` different from the one the session started with.
+- dispatch defaults autoExitOnQuiet to true (8s of silence after a 15s startup grace period, both configurable) and hands-free defaults to false. The completion notification reports that completion reason separately from a user kill, and a quiet auto-close is not proof of task completion.
+- A spawned pi child in dispatch or hands-free reports its finished turn rather than having it inferred from silence: an interactive-shell-settled message carries its closing text before any quiet timeout. Write \`spawn.prompt\` so that closing message is a self-contained result, because it is what the parent receives. hands-free keeps the child alive for \`send\`; a dispatch child stops shortly after its turn settles, leaving its output reachable only through \`attach\` for five minutes. Other agents and raw commands keep the quiet heuristic.
+- Monitor event payloads arrive with the notification; query only when that payload is not enough. Output queries are rate-limited (60s by default); \`drain\` reads new raw output and \`incremental\` paginates rendered output.
+
+Monitor triggers each have one \`kind\` and one \`pattern\`. \`threshold\` applies only to numeric, \`poll\` only to poll-diff, \`fileWatch\` only to file-watch; do not send options belonging to another strategy.
+
+Examples:
 interactive_shell({ action: "start", command: "vim package.json" })
 interactive_shell({ action: "start", spawn: { agent: "pi", prompt: "Fix the bug", worktree: true }, mode: "dispatch", background: true })
-interactive_shell({ action: "query", sessionId: "shell-1" })
 interactive_shell({ action: "send", sessionId: "shell-1", input: "/compact", submit: true })
-interactive_shell({ action: "kill", sessionId: "shell-1" })
-interactive_shell({ action: "start", command: "npm test --watch", mode: "monitor", monitor: { strategy: "stream", triggers: [{ id: "fail", kind: "literal", pattern: "FAIL" }] } })
+interactive_shell({ action: "start", command: "npm run dev", mode: "monitor", monitor: { triggers: [{ id: "ready", kind: "literal", pattern: "Local:" }] } })
 interactive_shell({ action: "start", mode: "monitor", monitor: { strategy: "file-watch", fileWatch: { path: "./uploads" }, triggers: [{ id: "pdf", kind: "regex", pattern: "/\\.pdf$/i" }] } })
 
-Monitor triggers have one kind and one pattern: literal (exact substring), regex (/pattern/flags or bare regex), or numeric (regex plus required threshold). Omit threshold for literal/regex; use kind=numeric for captureGroup>=1 comparisons. poll is only for poll-diff; fileWatch is only for file-watch. Do not send inactive strategy options.
-
-interactive and hands-free return immediately with a sessionId. dispatch notifies on completion without polling; background=true runs dispatch headlessly. Dispatch defaults autoExitOnQuiet to true and reports that completion reason separately from a user kill. Use handsFree.autoExitOnQuiet=false when silence must not stop the process. Monitor mode emits events and lifecycle notifications; it does not auto-close on quiet unless requested.
-Query output only when needed (default rate limit: 60s). The user can take over, background, transfer output, or return control. Stop sending input during user takeover. Clean up only sessions created for the task.
-
-Structured spawn supports a prompt field for Pi, Codex, Claude, and Cursor using native CLI startup forms, or any custom key configured by the user. Raw command must include the CLI's startup prompt itself. reason is only a UI label. Prefer isolated worktrees for unattended agents.
-
-A pi spawn in dispatch or hands-free gets a private session directory, so its finished turn is reported instead of inferred from silence: an interactive-shell-settled message arrives with the child's closing text, before any quiet timeout. Write spawn.prompt so that closing message is a self-contained result, because it is what the parent receives. Use hands-free when the child must stay alive for follow-up work (its default autoExitOnQuiet is false, so action: "send" reaches it); a dispatch child stops shortly after its turn settles and its output is then reachable only through action: "attach" for five minutes. Other agents, raw commands, and pi runs whose session cannot be read keep the quiet heuristic (auto-close-quiet); a readable pi turn instead ends the session as agent-settled.
-
-Validation errors perform no operation. Correct the parameters; do not retry unchanged arguments, bypass validation by changing modes, or claim success. Launch failures may leave a worktree; follow the reported resource status.`;
+Structured spawn supports a prompt field for Pi, Codex, Claude, and Cursor, or any custom key configured by the user. A raw \`command\` must include the CLI's own startup prompt. \`reason\` is a UI label, not a subprocess prompt. Prefer worktrees for unattended agents.`;
 
 const outputFields = {
 	outputLines: Type.Optional(Type.Integer({ minimum: 1, maximum: 200, description: "Output lines (default: 20)." })),
@@ -53,22 +40,22 @@ const outputFields = {
 
 export const toolParameters = Type.Object({
 	action: StringEnum(["start", "query", "send", "configure", "kill", "background", "attach", "list", "dismiss", "monitor_status", "monitor_events"] as const),
-	command: Type.Optional(Type.String({ minLength: 1, description: "start only: raw CLI command; mutually exclusive with spawn." })),
+	command: Type.Optional(Type.String({ minLength: 1, description: "start only; exclusive with spawn." })),
 	spawn: Type.Optional(Type.Object({
 		agent: Type.Optional(Type.String({ minLength: 1, description: "Configured agent key; defaults to pi." })),
 		mode: Type.Optional(StringEnum(["fresh", "fork"] as const)),
 		worktree: Type.Optional(Type.Boolean()),
 		prompt: Type.Optional(Type.String({ minLength: 1, description: "Startup prompt for the spawned CLI." })),
 	}, { additionalProperties: false })),
-	sessionId: Type.Optional(Type.String({ minLength: 1, description: "Target an existing session; never combine with command/spawn." })),
-	all: Type.Optional(Type.Boolean({ description: "dismiss only: explicitly dismiss all background sessions instead of one sessionId." })),
+	sessionId: Type.Optional(Type.String({ minLength: 1, description: "Existing session; never combine with command/spawn." })),
+	all: Type.Optional(Type.Boolean({ description: "dismiss only: every background session instead of one." })),
 	...outputFields,
 	settings: Type.Optional(Type.Object({
 		updateInterval: Type.Optional(Type.Integer({ minimum: 1 })),
 		quietThreshold: Type.Optional(Type.Integer({ minimum: 1 })),
 	}, { additionalProperties: false })),
 	input: Type.Optional(Type.String({ description: "send only. This only types the text; it does not submit it." })),
-	submit: Type.Optional(Type.Boolean({ description: "send only: append Enter after input; submit:true alone sends Enter." })),
+	submit: Type.Optional(Type.Boolean({ description: "send only: append Enter; submit:true alone sends Enter." })),
 	inputKeys: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { minItems: 1, description: "Named keys: enter, escape, ctrl+c, up, etc." })),
 	inputHex: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { minItems: 1, description: "Raw bytes, e.g. 0x1b." })),
 	inputPaste: Type.Optional(Type.String({ description: "Bracketed paste; does not execute without submit:true." })),
@@ -110,7 +97,7 @@ export const toolParameters = Type.Object({
 			timeoutMs: Type.Optional(Type.Integer({ minimum: 100 })),
 		}, { additionalProperties: false })),
 	}, { additionalProperties: false })),
-	background: Type.Optional(Type.Boolean({ description: "start only: headless dispatch/monitor. To background an existing session use action=background." })),
+	background: Type.Optional(Type.Boolean({ description: "start only: headless dispatch/monitor. For an existing session use action=background." })),
 	monitorEventLimit: Type.Optional(Type.Integer({ minimum: 1 })),
 	monitorEventOffset: Type.Optional(Type.Integer({ minimum: 0 })),
 	monitorSinceEventId: Type.Optional(Type.Integer({ minimum: 0 })),

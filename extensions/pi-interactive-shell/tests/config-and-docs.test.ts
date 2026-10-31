@@ -147,7 +147,7 @@ describe("config + docs parity", () => {
 		expect(defaults.piSettlementMaxWait).toBe(30 * 60 * 1000);
 		expect(skill).toContain("reports real turns");
 		expect(skill).toContain("Only `hands-free` keeps the child alive");
-		expect(toolSchema).toContain("so its finished turn is reported instead of inferred from silence");
+		expect(toolSchema).toContain("reports its finished turn rather than having it inferred from silence");
 		expect(readme).toContain("so its own transcript is readable while it runs");
 		expect(readme).toContain("interactive-shell-settled");
 		expect(readme).toContain(`Dispatch defaults \`autoExitOnQuiet: true\` — the session gets a 15s startup grace period`);
@@ -173,7 +173,7 @@ describe("config + docs parity", () => {
 		}
 		expect(skill).toContain("Do not retry unchanged arguments");
 		expect(skill).toContain("Omit `threshold` for literal/regex matching");
-		expect(toolSchema).toContain("Omit threshold for literal/regex");
+		expect(toolSchema).toContain("Required for numeric; omit for literal/regex");
 
 		rmSync(root, { recursive: true, force: true });
 	});

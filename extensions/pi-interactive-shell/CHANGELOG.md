@@ -2,6 +2,11 @@
 
 All notable changes to the `pi-interactive-shell` extension will be documented in this file.
 
+## [0.17.1] - 2026-10-31
+
+### Changed
+- Cut the tool's per-request prompt by 1,877 characters (about 520 tokens, 18%) without dropping a capability. The description no longer restates the `action` enum as a hand-maintained list — it had drifted to nine entries while twelve existed — and no longer repeats the placeholder, validation, or `submit` rules that the parameter descriptions already state. Five examples replace seven, dropping the two that the schema made obvious. The `promptSnippet` now says only when to reach for the tool instead of repeating its rules, keeping the `submit=true` nudge because agents have skipped submission before. What remains is the part the schema cannot express: `command` XOR `spawn`, which `mode` needs which block, quiet-timeout defaults, and what a spawned pi child reports when its turn ends.
+
 ## [0.17.0] - 2026-10-31
 
 ### Added

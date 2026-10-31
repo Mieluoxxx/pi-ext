@@ -1394,8 +1394,10 @@ export default function interactiveShellExtension(pi: ExtensionAPI) {
 		...(deferToolLoading
 			? {}
 			: {
+				// The system-prompt listing: when to reach for this tool. How to call it
+				// lives in TOOL_DESCRIPTION, which every request carries anyway.
 				promptSnippet:
-					"Choose one explicit action. start launches a CLI or monitor; query only reads an existing session; send writes input (use submit=true for Enter); kill stops it. Omit unused fields, or use null under strict sampling. Never use empty-string/zero/false placeholders. Validation errors perform no operation; do not retry unchanged arguments.",
+					"interactive_shell runs interactive CLIs, supervised coding agents, and long-running processes in an observable overlay. Use bash for ordinary commands; input sent to a session needs submit=true to run.",
 			}),
 		parameters: toolParameters,
 		constrainedSampling: { type: "json_schema", strict: "prefer" },
