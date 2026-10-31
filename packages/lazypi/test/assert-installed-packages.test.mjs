@@ -22,7 +22,7 @@ test("catalog matches the normalized seven-extension pi list snapshot", () => {
 	const expected = [
 		"npm:pi-workspace-history", "npm:@getpipher/vision", "npm:pi-zentui",
 		"npm:@moguw/pi-interactive-shell",
-		"git:github.com/DietrichGebert/ponytail@v4.9.0",
+		"git:github.com/DietrichGebert/ponytail@v5.3.3",
 		"npm:@moguw/pi-session-rename",
 		"npm:@moguw/pi-advisor",
 	];

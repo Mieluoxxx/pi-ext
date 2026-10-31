@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.0 — 2026-10-31
+
+- Move `ponytail` from `v4.9.0` to `v5.3.3`, 161 commits. Ponytail 5 rebuilds the ruleset, `review`, and `audit`, and the deferral marker in code comments becomes `shortcut:` — `/ponytail-debt` still finds older `ponytail:` comments. The pi extension gains `/ponytail` argument autocomplete and fixes that kept the session's mode after `/tree`, `/clear`, `/resume`, and OMP session switches; `/ponytail-gain` now reports the agentic benchmark averages. The status indicator is still registered as `ponytail`, so the `ui` preset's `zentui` layout and the runtime modes (`off`/`lite`/`full`/`ultra`, plus session-only `review`) are unchanged.
+
 ## 0.11.0 — 2026-10-31
 
 - Requires `@moguw/pi-interactive-shell` 0.17.0: a spawned `pi` child now reports each finished turn instead of the parent inferring completion from terminal silence, `query`/`send`/`kill` reach sessions that only the background table knows, and each incremental reader owns its own cursor so `drain` and hands-free updates no longer consume each other's output.

@@ -31,7 +31,7 @@ export const PACKAGES = [
 	{ id: "zentui", category: "ui", source: "npm:pi-zentui", description: "终端界面美化", hint: "Opencode 风格编辑框与消息样式，Starship 风格状态栏，四类界面元素独立配置。" },
 	// tools
 	{ id: "interactive-shell", category: "tools", source: "npm:@moguw/pi-interactive-shell", description: "交互式 Shell 覆盖层", hint: "在可观察的覆盖层中运行长时间 CLI 与终端工作流。" },
-	{ id: "ponytail", category: "tools", source: "git:github.com/DietrichGebert/ponytail@v4.9.0", description: "极简编码准则", hint: "懒惰资深工程师模式：能不写的代码就不写，优先复用现有实现，保持安全底线。" },
+	{ id: "ponytail", category: "tools", source: "git:github.com/DietrichGebert/ponytail@v5.3.3", description: "极简编码准则", hint: "懒惰资深工程师模式：能不写的代码就不写，优先复用现有实现，保持安全底线。" },
 	// sessions
 	{ id: "session-rename", category: "sessions", source: "npm:@moguw/pi-session-rename", description: "会话自动命名", hint: "根据对话上下文自动给会话起名，/rename 随时手动管理。" },
 	// themes
