@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.1 — 2026-10-31
+
+- Requires `@moguw/pi-interactive-shell` 0.17.1: the tool's per-request prompt drops from 10,676 to 8,799 characters (about 520 tokens). The hand-maintained action list is gone — it listed nine of the twelve actions — and the rules it duplicated now live only on the fields that state them. Capability is unchanged.
+
 ## 0.12.0 — 2026-10-31
 
 - Move `ponytail` from `v4.9.0` to `v5.3.3`, 161 commits. Ponytail 5 rebuilds the ruleset, `review`, and `audit`, and the deferral marker in code comments becomes `shortcut:` — `/ponytail-debt` still finds older `ponytail:` comments. The pi extension gains `/ponytail` argument autocomplete and fixes that kept the session's mode after `/tree`, `/clear`, `/resume`, and OMP session switches; `/ponytail-gain` now reports the agentic benchmark averages. The status indicator is still registered as `ponytail`, so the `ui` preset's `zentui` layout and the runtime modes (`off`/`lite`/`full`/`ultra`, plus session-only `review`) are unchanged.
