@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.11.0 — 2026-10-31
+
+- Requires `@moguw/pi-interactive-shell` 0.17.0: a spawned `pi` child now reports each finished turn instead of the parent inferring completion from terminal silence, `query`/`send`/`kill` reach sessions that only the background table knows, and each incremental reader owns its own cursor so `drain` and hands-free updates no longer consume each other's output.
+- Requires `@moguw/pi-session-rename` 0.3.1: an unnamed session is now due on every turn past `afterSteps`, so a failed first attempt or a continued session (`pi -c`) is no longer left nameless until the next `everySteps` cycle.
+
 ## 0.10.0 — 2026-10-30
 
 - Drop `goal`: it is no longer installed. `@narumitw/pi-goal` stays published on npm, and the `workflow` preset no longer requires it or ships its `pi-goal.json` continuation limit. Catalog matches a 7-extension snapshot.
