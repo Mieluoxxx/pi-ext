@@ -81,7 +81,9 @@ The previous `~/.pi/agent/pi-session.json` path is not read or migrated.
 
 - Naming uses the configured model, or the current session model when `model` is empty, through `pi-ai`.
 - Auto-rename fires on the `afterSteps`-th user-agent turn (default: the first), then again every
-  `everySteps` turns (default: 5) so the title tracks how the conversation evolves.
+  `everySteps` turns (default: 5) so the title tracks how the conversation evolves. An unnamed
+  session retries on every turn past `afterSteps`, so a failed first attempt or a continued
+  session (`pi -c`) does not wait a whole cycle for its first name.
 - Naming runs on `agent_settled`, once per user turn, so retries, aborts, and queued
   continuations never trigger a second request.
 - Titles follow `MMDD｜TYPE｜Topic`: the session start date in Asia/Shanghai, a type code — one of

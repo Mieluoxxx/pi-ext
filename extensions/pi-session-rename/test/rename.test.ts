@@ -436,6 +436,16 @@ describe("isNamingDue", () => {
 		expect(isNamingDue(10, 0, 5)).toBe(false);
 	});
 
+	it("keeps an unnamed session due on every turn until it gets a name", () => {
+		// Turn 4 is past afterSteps but off the everySteps cycle: a continued session (`pi -c`)
+		// or a failed first attempt would stay nameless until turn 6 without this.
+		expect(isNamingDue(4, 1, 5)).toBe(false);
+		expect(isNamingDue(4, 1, 5, true)).toBe(true);
+		// An owned name still follows the cycle, and afterSteps 0 still disables naming.
+		expect(isNamingDue(4, 1, 5, false)).toBe(false);
+		expect(isNamingDue(4, 0, 5, true)).toBe(false);
+	});
+
 	it("waits until afterSteps is reached", () => {
 		expect(isNamingDue(2, 3, 5)).toBe(false);
 		expect(isNamingDue(3, 3, 5)).toBe(true);

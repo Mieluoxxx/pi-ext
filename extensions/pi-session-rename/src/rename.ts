@@ -210,10 +210,18 @@ export function shouldApplyAutoName(
 	return currentName === lastAutoName;
 }
 
-// Fires on the afterSteps-th turn, then again every everySteps turns after it.
-export function isNamingDue(turns: number, afterSteps: number, everySteps: number): boolean {
+// Fires on the afterSteps-th turn, then again every everySteps turns after it. An unnamed
+// session is due on every turn past afterSteps: a failed first attempt, or a continued
+// session (`pi -c`) whose turn count already passed afterSteps, would otherwise sit
+// nameless until the next everySteps cycle.
+export function isNamingDue(
+	turns: number,
+	afterSteps: number,
+	everySteps: number,
+	unnamed = false,
+): boolean {
 	if (afterSteps <= 0 || turns < afterSteps) return false;
-	if (turns === afterSteps) return true;
+	if (turns === afterSteps || unnamed) return true;
 	return everySteps > 0 && (turns - afterSteps) % everySteps === 0;
 }
 
@@ -404,7 +412,7 @@ export default function (pi: ExtensionAPI) {
 		}
 
 		if (userAgentTurns === lastNamedTurn) return;
-		if (!isNamingDue(userAgentTurns, config.afterSteps, config.everySteps)) return;
+		if (!isNamingDue(userAgentTurns, config.afterSteps, config.everySteps, !currentName)) return;
 
 		// Mark the attempt, not the success: a broken naming model must not re-fire on
 		// every settle of the same turn. /rename retries manually.
