@@ -28,7 +28,7 @@ Select what gets installed:
 
 ```bash
 npx @moguw/lazypi --only core              # only a category
-npx @moguw/lazypi --only vision,advisor    # only specific extension ids
+npx @moguw/lazypi --only image-preview,advisor # only specific extension ids
 npx @moguw/lazypi --except tools           # everything but a category
 npx @moguw/lazypi --local                  # install into .pi/settings.json of the current project
 ```
@@ -37,11 +37,12 @@ npx @moguw/lazypi --local                  # install into .pi/settings.json of t
 
 ### Portable package sources
 
-The extension set follows the approved 7-extension `pi list` snapshot, normalizing three local [pi-ext](https://github.com/Mieluoxxx/pi-ext) checkouts to their `@moguw` npm package sources. Four existing file entries (AGENTS, the two Vesper themes and `vision.json`) remain separate from that extension list. npm sources remain unpinned; package-name parity is not a guarantee of byte-for-byte version parity. Publish new package versions before releasing a LazyPi catalog that requires them.
+The extension set follows the approved 7-extension `pi list` snapshot, normalizing four local [pi-ext](https://github.com/Mieluoxxx/pi-ext) checkouts to their `@moguw` npm package sources. Three existing file entries (AGENTS and the two Vesper themes) remain separate from that extension list. npm sources remain unpinned; package-name parity is not a guarantee of byte-for-byte version parity. Publish new package versions before releasing a LazyPi catalog that requires them.
 
 | Catalog id | Category | Pi install source |
 | --- | --- | --- |
 | `advisor` | `core` | `npm:@moguw/pi-advisor` |
+| `image-preview` | `core` | `npm:@moguw/pi-image-preview` |
 | `interactive-shell` | `tools` | `npm:@moguw/pi-interactive-shell` |
 | `session-rename` | `sessions` | `npm:@moguw/pi-session-rename` |
 
@@ -51,6 +52,7 @@ Catalog updates do **not** migrate existing local-path registrations or uninstal
 
 ### Newly aligned tools
 
+- **[pi-image-preview](https://www.npmjs.com/package/@moguw/pi-image-preview)** previews an image above the editor as you type its path, then attaches those same bytes and replaces the path with a numbered marker when you send. It is a UI extension: recent models read images natively, so nothing routes them through a second vision model any more. `@getpipher/vision` stays published — install it directly with `pi install npm:@getpipher/vision` if you still want that delegation layer.
 - **[pi-advisor](https://github.com/Mieluoxxx/pi-ext/tree/main/extensions/pi-advisor)** runs independent advisor consultations with stable cache prefixes, budget metering, timeouts and opt-in completion review; it is derived from `rpiv-mono`'s rpiv-advisor. Its model selection lives in `~/.config/rpiv-advisor/advisor.json`, outside the agent directory — copy that file manually when replicating; `WATCHDOG.yml` belongs to the retired pi-omp-advisor and is not part of this catalog.
 
 Model configuration ships through the optional `models` preset: the provider catalog is sanitized so every `apiKey` is the `$CPA_API_KEY` environment reference, never a literal credential. `auth.json`, project trust and sessions are never copied; on the maintainer's machine `auth.json` is empty and authentication goes through the local proxy key.

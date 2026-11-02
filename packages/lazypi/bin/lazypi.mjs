@@ -26,7 +26,7 @@ export const PACKAGES = [
 	// core
 	{ id: "advisor", category: "core", source: "npm:@moguw/pi-advisor", description: "实时会话顾问", hint: "主模型在动笔前、卡住或宣布完成前自主调用零参数 advisor()；稳定缓存前缀、费用预算与超时、按收益保活；同模型直接禁用。模型选择存于 ~/.config/rpiv-advisor/advisor.json，不在 agent 目录内。", conflicts: ["npm:@juicesharp/rpiv-advisor", "npm:pi-omp-advisor"] },
 	{ id: "workspace-history", category: "core", source: "npm:pi-workspace-history", description: "工作区回溯", hint: "回滚的不只是聊天记录——导航历史时同步恢复工作区文件，支持 /undo、/redo 与 /tree。" },
-	{ id: "vision", category: "core", source: "npm:@getpipher/vision", description: "视觉能力", hint: "按主模型能力自动路由：多模态直读图片，纯文本模型才委托视觉模型分析；vision-config 配置条目定制路由与缓存。" },
+	{ id: "image-preview", category: "core", source: "npm:@moguw/pi-image-preview", description: "图片预览与附加", hint: "在编辑器上方即打即看：输入图片路径就显示预览，发送时把图片随消息附带，路径替换为编号标记。" },
 	// ui
 	{ id: "zentui", category: "ui", source: "npm:pi-zentui", description: "终端界面美化", hint: "Opencode 风格编辑框与消息样式，Starship 风格状态栏，四类界面元素独立配置。" },
 	// tools
@@ -39,7 +39,6 @@ export const PACKAGES = [
 	{ id: "vesper-light", category: "themes", themeFiles: ["themes/vesper-light.json"], description: "Vesper 亮色主题", hint: "暖米色底的亮色变体，桃色强调、薄荷点缀；将 settings.theme 设为 \"vesper-light\" 启用。" },
 	// config
 	{ id: "global-agents", category: "config", agentFiles: ["agent/AGENTS.md"], description: "全局 AGENTS.md", hint: "安装全局 agent 配置文件到 ~/.pi/agent/AGENTS.md，覆盖前自动备份。" },
-	{ id: "vision-config", category: "config", agentFiles: ["agent/vision.json"], description: "Vision 配置", hint: "安装 vision.json 到 agent 根目录，定制视觉路由、缓存与重试行为；覆盖前自动备份。" },
 ];
 const CATEGORIES = [...new Set(PACKAGES.map((pkg) => pkg.category))];
 
@@ -382,7 +381,7 @@ ${bold("Examples:")}
   ${PACKAGE_COMMAND} --yes                        # everything, no prompt
   ${PACKAGE_COMMAND} --force                      # force reinstall everything
   ${PACKAGE_COMMAND} --only core                  # core extensions
-  ${PACKAGE_COMMAND} --only vision,advisor         # selected extensions
+  ${PACKAGE_COMMAND} --only image-preview,advisor    # selected extensions
   ${PACKAGE_COMMAND} --only core --local          # project-local install
   ${PACKAGE_COMMAND} status
   ${PACKAGE_COMMAND} doctor`);

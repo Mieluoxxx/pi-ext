@@ -20,7 +20,7 @@ test("pi-ext catalog entries use the published moguw sources", () => {
 
 test("catalog matches the normalized seven-extension pi list snapshot", () => {
 	const expected = [
-		"npm:pi-workspace-history", "npm:@getpipher/vision", "npm:pi-zentui",
+		"npm:pi-workspace-history", "npm:@moguw/pi-image-preview", "npm:pi-zentui",
 		"npm:@moguw/pi-interactive-shell",
 		"git:github.com/DietrichGebert/ponytail@v5.3.3",
 		"npm:@moguw/pi-session-rename",
@@ -28,7 +28,7 @@ test("catalog matches the normalized seven-extension pi list snapshot", () => {
 	];
 	assert.deepEqual(expectedPackageSources().sort(), expected.sort());
 	assert.equal(PACKAGES.find((pkg) => pkg.id === "advisor").source, "npm:@moguw/pi-advisor");
-	assert.deepEqual(PACKAGES.filter((pkg) => !pkg.source).map((pkg) => pkg.id), ["vesper-dark", "vesper-light", "global-agents", "vision-config"]);
+	assert.deepEqual(PACKAGES.filter((pkg) => !pkg.source).map((pkg) => pkg.id), ["vesper-dark", "vesper-light", "global-agents"]);
 });
 
 test("expectedPackageSources supports excluded package ids", () => {

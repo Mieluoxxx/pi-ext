@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.13.0 — 2026-11-02
+
+- Replace `vision` with `image-preview` in the catalog. `npm:@moguw/pi-image-preview` previews an image above the editor as you type its path, then attaches those same bytes and replaces the path with a numbered marker when you send. Recent models read images natively, so the second vision model that `npm:@getpipher/vision` routed through is gone; `@getpipher/vision` stays published and installs with `pi install npm:@getpipher/vision`. Catalog still matches a 7-extension `pi list` snapshot.
+- Drop the `vision-config` entry and `agent/vision.json`. The file only configured that extension's routing, cache and retry behavior, and `pi-image-preview` needs no equivalent, so three file-based entries remain: AGENTS and the two Vesper themes.
+
 ## 0.12.1 — 2026-10-31
 
 - Requires `@moguw/pi-interactive-shell` 0.17.1: the tool's per-request prompt drops from 10,676 to 8,799 characters (about 520 tokens). The hand-maintained action list is gone — it listed nine of the twelve actions — and the rules it duplicated now live only on the fields that state them. Capability is unchanged.

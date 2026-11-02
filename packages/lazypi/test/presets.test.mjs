@@ -116,10 +116,10 @@ test("dry-run works without Pi and performs no configuration writes", (t) => {
 test("installs only preset requirements and rebases over Pi settings updates", (t) => {
 	const state = workspace(t);
 	writeJson(join(state.agentDir, "settings.json"), { packages: ["npm:keep"], defaultThinkingLevel: "medium" });
-	const file = preset(state, "custom", [{ to: "agent/settings.json", value: { defaultThinkingLevel: "high" } }], ["vision"]);
+	const file = preset(state, "custom", [{ to: "agent/settings.json", value: { defaultThinkingLevel: "high" } }], ["image-preview"]);
 	success(run(state, ["--preset", file, "--only", "workspace-history", "--yes"]));
 	const settings = json(join(state.agentDir, "settings.json"));
-	assert.deepEqual(settings.packages, ["npm:keep", source("workspace-history"), source("vision")]);
+	assert.deepEqual(settings.packages, ["npm:keep", source("workspace-history"), source("image-preview")]);
 	assert.equal(settings.installerNote, "preserve this new field");
 	assert.equal(settings.defaultThinkingLevel, "high");
 	assert.equal(readFileSync(state.calls, "utf8").trim().split("\n").length, 2);
@@ -129,8 +129,8 @@ test("package failures and managed-field races leave all preset files unapplied"
 	for (const fail of [true, false]) {
 		const state = workspace(t);
 		writeJson(join(state.agentDir, "settings.json"), { defaultThinkingLevel: "medium" });
-		const file = preset(state, "custom", [{ to: "agent/settings.json", value: { defaultThinkingLevel: "high" } }], ["vision"]);
-		const result = run(state, ["--preset", "base", "--preset", file, "--yes"], fail ? { PI_TEST_FAIL_SOURCE: source("vision") } : { PI_TEST_MUTATE: "1" });
+		const file = preset(state, "custom", [{ to: "agent/settings.json", value: { defaultThinkingLevel: "high" } }], ["image-preview"]);
+		const result = run(state, ["--preset", "base", "--preset", file, "--yes"], fail ? { PI_TEST_FAIL_SOURCE: source("image-preview") } : { PI_TEST_MUTATE: "1" });
 		assert.notEqual(result.status, 0);
 		assert.equal(existsSync(join(state.agentDir, "AGENTS.md")), false);
 		assert.equal(existsSync(join(state.agentDir, "keybindings.json")), false);
@@ -141,7 +141,7 @@ test("package failures and managed-field races leave all preset files unapplied"
 
 test("unsafe flags and exclusions fail before package or config operations", (t) => {
 	const state = workspace(t);
-	for (const args of [["--local"], ["--force"], ["--except", "global-agents"], ["--only", "vision", "--except", "vision"]]) {
+	for (const args of [["--local"], ["--force"], ["--except", "global-agents"], ["--only", "image-preview", "--except", "image-preview"]]) {
 		assert.notEqual(run(state, ["--preset", "base", ...args, "--yes"]).status, 0);
 	}
 	for (const args of [["update", "--preset", "base"], ["--preset"], ["--preset="], ["--dry-run"]]) assert.notEqual(run(state, args).status, 0);
@@ -168,7 +168,7 @@ test("preflight rejects unsafe targets, settings aliases, modes and private pars
 		{ to: "agent/custom.json", value: "[]" },
 	];
 	for (const entry of cases) {
-		const file = preset(state, "invalid", [entry], ["vision"]);
+		const file = preset(state, "invalid", [entry], ["image-preview"]);
 		const result = run(state, ["--preset", file, "--yes"]);
 		assert.notEqual(result.status, 0, JSON.stringify(entry));
 		assert.doesNotMatch(result.stdout + result.stderr, /DO-NOT-PRINT-THIS/);
@@ -183,7 +183,7 @@ test("target casing aliases and mixed modes are rejected", (t) => {
 		[{ to: "agent/Custom.json", value: {} }, { to: "agent/custom.json", value: {} }],
 		[{ to: "agent/custom.json", value: {} }, { to: "agent/custom.json", mode: "copy", value: {} }],
 	]) {
-		const file = preset(state, "conflict", files, ["vision"]);
+		const file = preset(state, "conflict", files, ["image-preview"]);
 		assert.notEqual(run(state, ["--preset", file, "--yes"]).status, 0);
 	}
 	assert.deepEqual(readdirSync(state.agentDir), []);
@@ -192,7 +192,7 @@ test("target casing aliases and mixed modes are rejected", (t) => {
 
 test("manifest validation and source confinement happen before installation", (t) => {
 	const state = workspace(t);
-	const file = preset(state, "invalid", [{ to: "agent/custom.json", value: {} }], ["vision"]);
+	const file = preset(state, "invalid", [{ to: "agent/custom.json", value: {} }], ["image-preview"]);
 	const original = json(file);
 	for (const manifest of [{ ...original, version: 2 }, { ...original, packages: ["unknown"] }, { ...original, execute: "command" }, { ...original, files: [{ ...original.files[0], from: "../outside.json" }] }]) {
 		writeJson(file, manifest);
@@ -288,11 +288,11 @@ test("ordered merges handle type replacements without resurrecting old fields", 
 
 test("local package duplicates block both preview and installation", (t) => {
 	const state = workspace(t);
-	const checkout = join(state.root, "local-vision");
+	const checkout = join(state.root, "local-image-preview");
 	mkdirSync(checkout);
-	writeJson(join(checkout, "package.json"), { name: "@getpipher/vision" });
+	writeJson(join(checkout, "package.json"), { name: "@moguw/pi-image-preview" });
 	writeJson(join(state.agentDir, "settings.json"), { packages: [checkout] });
-	const file = preset(state, "custom", [], ["vision"]);
+	const file = preset(state, "custom", [], ["image-preview"]);
 	for (const flag of ["--dry-run", "--yes"]) {
 		const result = run(state, ["--preset", file, flag]);
 		assert.notEqual(result.status, 0);
@@ -447,13 +447,13 @@ test("invalid model collections fail preflight without replacing existing data",
 		'{"providers":{"secret":"PRIVATE-PARSE-SENTINEL" broken}}',
 	];
 	for (const value of invalid) {
-		const file = preset(state, "invalid-models", [{ to: "agent/models.json", mode: "merge-models", value }], ["vision"]);
+		const file = preset(state, "invalid-models", [{ to: "agent/models.json", mode: "merge-models", value }], ["image-preview"]);
 		const result = run(state, ["--preset", file, "--yes"]);
 		assert.notEqual(result.status, 0);
 		assert.doesNotMatch(result.stdout + result.stderr, /PRIVATE-PARSE-SENTINEL/);
 		assert.equal(readFileSync(target, "utf8"), original);
 	}
-	const valid = preset(state, "valid-models", [{ to: "agent/models.json", mode: "merge-models", value: { providers: { keep: { models: [] } } } }], ["vision"]);
+	const valid = preset(state, "valid-models", [{ to: "agent/models.json", mode: "merge-models", value: { providers: { keep: { models: [] } } } }], ["image-preview"]);
 	for (const value of ["{broken", '{"providers":{"keep":{"models":[{"id":"same"},{"id":"same"}]}}}']) {
 		writeFileSync(target, value);
 		assert.notEqual(run(state, ["--preset", "base", "--preset", valid, "--yes"]).status, 0);

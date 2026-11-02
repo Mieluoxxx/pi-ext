@@ -60,8 +60,8 @@ test("new tool packages install from npm and skip already-installed sources", (t
 	const state = createWorkspace(t);
 	writeFakePi(state.bin);
 	const callsPath = join(state.root, "pi-calls.log");
-	const sources = ["npm:@moguw/pi-advisor", "npm:@getpipher/vision"];
-	const args = ["--yes", "--only", "vision,advisor"];
+	const sources = ["npm:@moguw/pi-advisor", "npm:@moguw/pi-image-preview"];
+	const args = ["--yes", "--only", "image-preview,advisor"];
 	const first = runCli(args, { ...state, callsPath });
 	assert.equal(first.status, 0, `STDOUT:\n${first.stdout}\nSTDERR:\n${first.stderr}`);
 	const calls = readFileSync(callsPath, "utf8");
